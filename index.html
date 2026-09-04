@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>CSWIND · QR-ID Thợ hàn</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#f5f7fa; --card:#ffffff; --ink:#1a2433; --muted:#5b6b7d; --line:#e2e8f0;
+  --brand:#0b3d91; --brand2:#1558c7; --ok:#1a8f5e; --warn:#ca8a04; --bad:#c2410c;
+  --badge-ok-bg:#e6f6ee; --badge-warn-bg:#fef9c3; --badge-bad-bg:#ffedd5; --chip-bg:#eef1f5;
+  --readonly-bg:#fdf3dc; --readonly-border:#f0dfa8; --readonly-ink:#7a5c00;
+  --info-bg:#eaf1fc; --info-border:#c9dbf7; --info-ink:#123a73;
+  --subtle-bg:#fafbfc; --danger-border:#f2c2c2;
+  --avatar-warn:#d97706; --avatar-bad:#dc2626;
+  --radius:12px; --shadow:0 1px 3px rgba(20,30,50,.08), 0 1px 2px rgba(20,30,50,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1420; --card:#161f2c; --ink:#e8edf5; --muted:#93a1b8; --line:#2a3547;
+    --brand:#3d7fe0; --brand2:#5b9bf0; --ok:#34d399; --warn:#f0c53e; --bad:#f0733f;
+    --badge-ok-bg:#0f3324; --badge-warn-bg:#3a2f0d; --badge-bad-bg:#3a2010; --chip-bg:#212b3a;
+    --readonly-bg:#332a0c; --readonly-border:#5c4d18; --readonly-ink:#f0d888;
+    --info-bg:#12233c; --info-border:#254876; --info-ink:#bcd6fb;
+    --subtle-bg:#1c2635; --danger-border:#5c2c22;
+    --avatar-warn:#fb923c; --avatar-bad:#f87171;
+    --shadow:0 1px 3px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1420; --card:#161f2c; --ink:#e8edf5; --muted:#93a1b8; --line:#2a3547;
+  --brand:#3d7fe0; --brand2:#5b9bf0; --ok:#34d399; --warn:#f0c53e; --bad:#f0733f;
+  --badge-ok-bg:#0f3324; --badge-warn-bg:#3a2f0d; --badge-bad-bg:#3a2010; --chip-bg:#212b3a;
+  --readonly-bg:#332a0c; --readonly-border:#5c4d18; --readonly-ink:#f0d888;
+  --info-bg:#12233c; --info-border:#254876; --info-ink:#bcd6fb;
+  --subtle-bg:#1c2635; --danger-border:#5c2c22;
+  --avatar-warn:#fb923c; --avatar-bad:#f87171;
+  --shadow:0 1px 3px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+header.top{background:var(--brand);color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header.top .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px}
+header.top .brand .logo{width:30px;height:30px;border-radius:7px;background:#fff;color:var(--brand);display:flex;align-items:center;justify-content:center;font-weight:800}
+header.top .clock{font-size:13px;opacity:.92;font-variant-numeric:tabular-nums}
+.session-badge{font-size:12px;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.16);border-radius:99px;padding:4px 10px 4px 4px;white-space:nowrap}
+.session-badge .role-pill{padding:1px 8px;border-radius:99px;font-weight:800;font-size:10.5px;text-transform:uppercase;letter-spacing:.02em}
+.session-badge .role-pill.r-superadmin{background:#fde68a;color:#7a5c00}
+.session-badge .role-pill.r-editor{background:#bbf7d0;color:#065f36}
+.session-badge .role-pill.r-viewer{background:#e2e8f0;color:#334155}
+.tabs{display:flex;gap:0;background:var(--card);border-bottom:1px solid var(--line);padding:0 12px;overflow-x:auto}
+.tab-btn{border:none;background:none;padding:12px 16px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+.tab-btn.active{color:var(--brand);border-bottom-color:var(--brand)}
+main{max-width:1080px;margin:0 auto;padding:16px}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input[type=text],input[type=password],input[type=date],input[type=number],select,textarea{
+  font:inherit;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);width:100%
+}
+textarea{resize:vertical}
+button{font:inherit;cursor:pointer}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 14px;border-radius:8px;font-weight:600;font-size:13.5px}
+.btn:hover{border-color:var(--brand2)}
+.btn-primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn-primary:hover{background:var(--brand2)}
+.btn-danger{background:var(--card);border-color:var(--danger-border);color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-sm{padding:6px 10px;font-size:12.5px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.wcard{border:1px solid var(--line);border-left:6px solid var(--line);border-radius:10px;padding:14px;cursor:pointer;background:var(--card);transition:box-shadow .15s;display:flex;gap:14px;align-items:center}
+.wcard:hover{box-shadow:var(--shadow)}
+.wcard.st-ok{border-left-color:var(--ok)}
+.wcard.st-warn{border-left-color:var(--warn)}
+.wcard.st-bad{border-left-color:var(--bad)}
+.wcard-avatar{width:58px;height:58px;border-radius:50%;object-fit:cover;flex:none;border:1px solid var(--line)}
+.wcard-avatar-fallback{width:58px;height:58px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;color:#fff;background:var(--brand)}
+.wcard-avatar-fallback.av-ok{background:var(--ok)}
+.wcard-avatar-fallback.av-warn{background:var(--avatar-warn)}
+.wcard-avatar-fallback.av-bad{background:var(--avatar-bad)}
+.wcard-body{flex:1;min-width:0;text-align:right}
+.wcard .idw{font-weight:700;color:var(--brand);font-size:13px}
+.wcard .nm{font-weight:600;margin:3px 0 6px}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:700}
+.badge-ok{background:var(--badge-ok-bg);color:var(--ok)}
+.badge-warn{background:var(--badge-warn-bg);color:var(--warn)}
+.badge-bad{background:var(--badge-bad-bg);color:var(--bad)}
+.badge-none{background:var(--chip-bg);color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.02em}
+th[data-sort]{cursor:pointer;user-select:none}
+th[data-sort]:hover{color:var(--ink)}
+.muted{color:var(--muted)}
+.small{font-size:12.5px}
+h1,h2,h3{margin:0 0 8px}
+h2{font-size:16px}
+.overlay{position:fixed;inset:0;background:rgba(10,14,22,.6);display:none;align-items:flex-start;justify-content:center;padding:24px 12px;overflow-y:auto;z-index:50}
+.overlay.open{display:flex}
+.modal{background:var(--card);color:var(--ink);border-radius:14px;max-width:640px;width:100%;padding:20px;margin-top:20px;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+.modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px}
+.modal-close{border:none;background:none;font-size:22px;line-height:1;cursor:pointer;color:var(--muted);padding:2px 6px}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1a2433;color:#fff;padding:10px 18px;border-radius:99px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:99}
+.toast.show{opacity:1}
+.readonly-banner{background:var(--readonly-bg);border:1px solid var(--readonly-border);color:var(--readonly-ink);padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:13.5px}
+.login-box{max-width:340px;margin:40px auto}
+.stat{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.stat .box{flex:1;min-width:120px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px}
+.stat .box .n{font-size:22px;font-weight:800}
+.stat .box .l{font-size:12px;color:var(--muted)}
+img.cert-photo{max-width:100%;border-radius:8px;border:1px solid var(--line)}
+.footer-note{text-align:center;color:var(--muted);font-size:12px;padding:18px 0 30px}
+a{color:var(--brand2)}
+.qr-box{text-align:center}
+.qr-box img{width:220px;height:220px;image-rendering:pixelated}
+input[type=file]{font-size:13px}
+.chip{display:inline-flex;align-items:center;gap:5px;background:var(--chip-bg);border-radius:99px;padding:3px 10px;font-size:12px;margin:2px 4px 2px 0}
+.lang-switch,.theme-switch{display:flex;border:1px solid rgba(255,255,255,.4);border-radius:7px;overflow:hidden}
+.lang-btn,.theme-btn{border:none;background:none;color:#fff;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;opacity:.7;white-space:nowrap}
+.lang-btn.active,.theme-btn.active{background:rgba(255,255,255,.22);opacity:1}
+.field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px;font-weight:600}
+.field{margin-bottom:10px}
+.cert-edit-row{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;background:var(--subtle-bg)}
+.cert-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cert-edit-grid .field{margin-bottom:6px}
+.modal-lg{max-width:760px}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;border-top:1px solid var(--line);padding-top:14px}
+.dropzone{border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;color:var(--muted);font-size:13.5px}
+.import-summary{background:var(--bg);border-radius:8px;padding:10px 12px;font-size:13px;margin-top:10px}
+.chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.status-chip{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink);display:inline-flex;align-items:center;gap:6px}
+.status-chip .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+.status-chip.st-ok .dot{background:var(--ok)}
+.status-chip.st-warn .dot{background:var(--warn)}
+.status-chip.st-bad .dot{background:var(--bad)}
+.status-chip.active{background:var(--brand);border-color:var(--brand);color:#fff}
+.status-chip.active .dot{background:#fff}
+.info-banner{background:var(--info-bg);border:1px solid var(--info-border);color:var(--info-ink);padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:13.5px;line-height:1.55}
+.subtle-card{background:var(--subtle-bg);border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:12px}
+.acc-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap}
+.acc-row:last-child{border-bottom:none}
+.thumb-sm{width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
+.thumb-md{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.thumb-lg{width:56px;height:56px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+@media (max-width:600px){ main{padding:10px} .stat{gap:8px} .cert-edit-grid{grid-template-columns:1fr} .session-badge{display:none} }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><span class="logo">CS</span> <span id="app-title">CSWIND QR-ID Thợ hàn</span></div>
+  <div class="row" style="gap:14px">
+    <div class="session-badge" id="session-badge" style="display:none"></div>
+    <div class="clock" id="live-clock">--:--:--</div>
+    <div class="theme-switch" id="theme-switch">
+      <button type="button" class="theme-btn" data-theme-choice="light">Trắng</button>
+      <button type="button" class="theme-btn" data-theme-choice="dark">Đen</button>
+      <button type="button" class="theme-btn active" data-theme-choice="system">Hệ thống</button>
+    </div>
+    <div class="lang-switch" id="lang-switch">
+      <button type="button" class="lang-btn active" data-lang="vi">VI</button>
+      <button type="button" class="lang-btn" data-lang="en">EN</button>
+    </div>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="lookup" id="tabbtn-lookup">Tra cứu</button>
+  <button class="tab-btn" data-tab="admin" id="tabbtn-admin">Quản trị</button>
+</div>
+
+<main>
+  <div id="readonly-banner" class="readonly-banner" style="display:none"></div>
+
+  <section id="tab-lookup">
+    <div class="info-banner" id="public-info-banner"></div>
+    <div class="stat" id="stat-row"></div>
+    <div class="card">
+      <div class="row">
+        <div style="flex:1;min-width:220px"><input type="text" id="search-box" placeholder=""></div>
+        <select id="filter-process" style="max-width:200px"></select>
+        <select id="filter-joint" style="max-width:200px"></select>
+      </div>
+      <div class="chip-row" id="status-chip-row"></div>
+    </div>
+    <div class="grid" id="public-grid"></div>
+  </section>
+
+  <section id="tab-admin" style="display:none">
+    <div id="admin-login-view"></div>
+    <div id="admin-panel-view" style="display:none"></div>
+  </section>
+
+  <div class="footer-note" id="footer-note"></div>
+</main>
+
+<div class="overlay" id="profile-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="row" style="align-items:center;gap:12px">
+        <img id="pm-photo" class="thumb-lg" style="display:none" alt="">
+        <div>
+          <h2 id="pm-name" style="margin-bottom:2px"></h2>
+          <div class="muted small" id="pm-sub"></div>
+          <div class="muted small" id="pm-updated"></div>
+        </div>
+      </div>
+      <button class="modal-close" data-close="profile-overlay">&times;</button>
+    </div>
+    <div class="qr-box" style="margin:8px 0 14px">
+      <img id="pm-qr-img" alt="QR">
+      <div class="small muted" id="pm-qr-hint" style="margin-top:6px"></div>
+    </div>
+    <div id="pm-certs"></div>
+    <div class="small muted" style="margin-top:10px" id="pm-link-line"></div>
+    <div class="modal-foot" style="justify-content:flex-start">
+      <a href="/" id="pm-home-link" class="btn btn-sm">← <span id="pm-home-label"></span></a>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="media-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="media-title" style="font-size:15px"></h2>
+      <button class="modal-close" data-close="media-overlay">&times;</button>
+    </div>
+    <div id="media-body"></div>
+    <div class="small muted" id="media-hint" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<div class="overlay" id="welder-form-overlay">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <h2 id="wf-title"></h2>
+      <button class="modal-close" data-close="welder-form-overlay">&times;</button>
+    </div>
+    <div id="wf-body"></div>
+  </div>
+</div>
+
+<div class="overlay" id="import-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="import-title"></h2>
+      <button class="modal-close" data-close="import-overlay">&times;</button>
+    </div>
+    <div id="import-body"></div>
+  </div>
+</div>
+
+<div class="overlay" id="confirm-overlay">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-head">
+      <h2 id="confirm-title" style="font-size:16px"></h2>
+      <button class="modal-close" id="confirm-close-x">&times;</button>
+    </div>
+    <div id="confirm-message" class="small" style="margin-bottom:10px"></div>
+    <div class="field" id="confirm-input-wrap" style="display:none">
+      <input type="text" id="confirm-input">
+    </div>
+    <div class="small" id="confirm-err" style="color:var(--bad);margin-bottom:6px"></div>
+    <div class="modal-foot">
+      <button type="button" class="btn" id="confirm-cancel-btn"></button>
+      <button type="button" class="btn btn-primary" id="confirm-ok-btn"></button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

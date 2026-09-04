@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.local
+
+# seed_data/welders_extracted.json contains real PII (260 real welders' names, employee IDs,
+# scanned certificate images). It is intentionally KEPT in this repo so the app can auto-
+# import it on first boot with zero manual steps -- but that only makes sense because this
+# repo is meant to stay PRIVATE. If you ever make this repository public, remove this file
+# and the seed_data/ folder first.
