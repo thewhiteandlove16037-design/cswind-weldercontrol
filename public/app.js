@@ -80,7 +80,9 @@ const L_VI = {
   certOriginalTitle: 'Chứng chỉ gốc', qrTitle: 'Mã QR',
   certOriginalHint: 'Nhấn giữ (điện thoại) hoặc chuột phải → Lưu ảnh để tải về.',
   qrHint: 'Mã QR này chứa trực tiếp thông tin thợ hàn — quét ra là thấy ngay, không cần mạng. Đây là ảnh chụp tại thời điểm tạo; nếu hồ sơ thay đổi, hãy mở lại và in mã QR mới.',
-  seeFullProfile: 'Xem đầy đủ',
+  seeFullProfile: 'Xem đầy đủ', backToHome: 'Trang chủ',
+  wpNotFoundTitle: 'Không tìm thấy thợ hàn', wpNotFoundHint: 'Đường link này không đúng hoặc hồ sơ đã bị xoá.',
+  wpPrintBtn: '🖨 In trang này',
   loginTitle: 'Đăng nhập quản trị', loginUsername: 'Tên đăng nhập', loginPassword: 'Mật khẩu',
   loginBtn: 'Đăng nhập', loginError: 'Sai tên đăng nhập hoặc mật khẩu.', logoutBtn: 'Đăng xuất',
   loginChecking: 'Đang kiểm tra…',
@@ -168,7 +170,9 @@ const L_EN = {
   certOriginalTitle: 'Original certificate', qrTitle: 'QR code',
   certOriginalHint: 'Press and hold (phone) or right-click → Save image to download.',
   qrHint: 'This QR code contains the welder\'s information directly — scanning it shows the details immediately, no network needed. This is a snapshot taken when generated; if the record changes, reopen and print a new QR code.',
-  seeFullProfile: 'Full profile',
+  seeFullProfile: 'Full profile', backToHome: 'Home',
+  wpNotFoundTitle: 'Welder not found', wpNotFoundHint: 'This link is invalid or the record was deleted.',
+  wpPrintBtn: '🖨 Print this page',
   loginTitle: 'Admin sign-in', loginUsername: 'Username', loginPassword: 'Password',
   loginBtn: 'Sign in', loginError: 'Incorrect username or password.', logoutBtn: 'Sign out',
   loginChecking: 'Checking…',
@@ -403,19 +407,32 @@ function renderSessionBadge(){
 }
 
 /* ================= DEEP LINKS (per-welder shareable URL, used by QR codes) =================
-   Each welder gets their own URL: <baseUrl>/w/<idWelder>. Scanning that welder's QR code
-   (or clicking their entry in the lookup grid) opens this app straight to their profile,
-   always showing live data from the server -- not a static snapshot. */
+   Each welder gets their own URL directly off the root: <baseUrl>/<idWelder> (e.g.
+   cswind-weldercontrol.onrender.com/cs9001). Scanning that welder's QR code -- or clicking
+   their entry in the lookup grid -- opens this app straight to their own profile, always
+   showing live data from the server, not a static snapshot. Lookup is case-insensitive so
+   a lowercase URL (nicer to type/share) still finds an uppercase idWelder like "CS9001". */
+function findWelderByIdCI(id){
+  const needle = String(id||'').toLowerCase();
+  return WELDERS.find(x=>x.idWelder.toLowerCase()===needle);
+}
 function welderDeepLink(idWelder){
   const base = (SETTINGS.baseUrl||'').trim();
   if(!base) return '';
-  return base.replace(/\/+$/,'') + '/w/' + encodeURIComponent(idWelder);
+  return base.replace(/\/+$/,'') + '/' + encodeURIComponent(idWelder.toLowerCase());
 }
 function pushProfileUrl(idWelder){
-  try{ history.pushState({idWelder}, '', '/w/'+encodeURIComponent(idWelder)); }catch(e){}
+  try{ history.pushState({idWelder}, '', '/'+encodeURIComponent(idWelder.toLowerCase())); }catch(e){}
 }
 function popProfileUrl(){
   try{ if(location.pathname!=='/') history.pushState({}, '', '/'); }catch(e){}
+}
+// Any single path segment other than "/" is treated as a possible welder-ID deep link (the
+// app has no other top-level routes). Returns null for "/" itself or a path with more than
+// one segment (e.g. an unrelated stray request that reached the SPA fallback).
+function deepLinkIdFromPath(pathname){
+  const m = pathname.match(/^\/([^/]+)$/);
+  return m ? decodeURIComponent(m[1]) : null;
 }
 
 /* ================= QR ================= */
@@ -455,7 +472,8 @@ function buildQrInfoText(idWelder){
     // apps, common in VN) detect a URI scheme and jump straight to opening it, skipping
     // the info text entirely. Dropping the scheme keeps this line plain text for those
     // scanners while smarter scanners (iOS Camera, Google Lens) still offer it as a
-    // tappable suggestion. The on-page profile link (pm-link-line) is unaffected.
+    // tappable suggestion. This whole function is only a fallback anyway (see
+    // buildQrPayload) -- once Base URL is set, the QR encodes the real deep link URL.
     const bareLink = SETTINGS.baseUrl.trim().replace(/^https?:\/\//i, '');
     lines.push(`${L.qrInfoMoreLabel}: ${bareLink}`);
   }
@@ -580,55 +598,119 @@ function renderPublicGrid(){
   }).join('');
 }
 
-/* ================= PROFILE MODAL ================= */
-function openProfile(idWelder, opts){
-  const w = WELDERS.find(x=>x.idWelder===idWelder);
-  if(!w) return;
-  $('#pm-name').textContent = w.name;
-  $('#pm-sub').textContent = `${w.idWelder}${w.idEmployee ? ' · '+L.colEmployeeId+' '+w.idEmployee : ''}${w.company ? ' · '+w.company : ''}`;
-  const pmPhoto = $('#pm-photo');
-  if(w.photo){ pmPhoto.src = w.photo; pmPhoto.style.display = ''; } else { pmPhoto.src = ''; pmPhoto.style.display = 'none'; }
-  $('#pm-updated').textContent = w.lastModified ? `${L.profileUpdatedLabel}: ${fmtDateTime(new Date(w.lastModified))}` : '';
-  $('#pm-qr-img').src = renderQrDataUrl(buildQrPayload(idWelder), 220);
-  $('#pm-qr-hint').textContent = L.qrScanHint;
-  $('#pm-certs').innerHTML = renderCertsTable(w);
-  const link = welderDeepLink(idWelder);
-  $('#pm-link-line').innerHTML = link ? `${L.seeFullProfile}: <a href="${esc(link)}" target="_blank" rel="noopener">${esc(link)}</a>` : '';
-  $('#profile-overlay').classList.add('open');
-  if(!opts || opts.updateUrl!==false) pushProfileUrl(idWelder);
+/* ================= STANDALONE WELDER PAGE (QR / deep-link target) =================
+   This is a genuine separate page -- not a popup over the lookup grid. Scanning a welder's
+   QR code (or clicking their entry anywhere in the app) navigates here via the URL
+   <baseUrl>/<idWelder> and shows nothing else: the tabs, the lookup grid and the admin
+   panel are all hidden while this is showing. Every certificate's original scanned image is
+   embedded directly on the page (no extra click needed) -- everything asked for lives in
+   this one link. */
+function showWelderPage(){
+  $('.tabs').style.display = 'none';
+  $('#tab-lookup').style.display = 'none';
+  $('#tab-admin').style.display = 'none';
+  $('#welder-page').style.display = 'block';
 }
-function renderCertsTable(w){
-  if(!w.certificates.length) return `<div class="muted small">${L.noCertsRecorded}</div>`;
-  const rows = w.certificates.map((c,i)=>{
-    const st = certStatus(c.validDate);
-    const viewBtn = c.originalCertImage
-      ? `<button class="btn btn-sm" data-view-cert="${esc(w.idWelder)}" data-cert-idx="${i}">${L.viewOriginalCert}</button>`
-      : `<span class="muted small">${L.noOriginalFile}</span>`;
-    return `<tr>
-      <td>${esc(c.process||'—')}${c.type ? ' · '+esc(c.type) : ''}</td>
-      <td>${fmtDate(c.validDate)}</td>
-      <td>${statusBadge(st)}</td>
-      <td>${viewBtn}</td>
-    </tr>`;
-  }).join('');
-  return `<table><thead><tr><th>${L.colProcess}</th><th>${L.colValidUntil}</th><th>${L.colStatus}</th><th>${L.colOriginalFile}</th></tr></thead><tbody>${rows}</tbody></table>`;
+function hideWelderPage(){
+  $('#welder-page').style.display = 'none';
+  $('.tabs').style.display = '';
+  activateTab(loadActiveTab());
 }
-function viewCertImage(idWelder, certIdx){
-  const w = WELDERS.find(x=>x.idWelder===idWelder);
-  if(!w) return;
-  const c = w.certificates[certIdx];
-  if(!c || !c.originalCertImage) return;
-  $('#media-title').textContent = `${L.certOriginalTitle} — ${w.name} (${w.idWelder})`;
-  $('#media-body').innerHTML = `<img class="cert-photo" src="${c.originalCertImage}" alt="${esc(L.certOriginalTitle)}">`;
-  $('#media-hint').textContent = L.certOriginalHint;
-  $('#media-overlay').classList.add('open');
+function wireWelderPageHomeLink(){
+  const el = $('#wp-home-link');
+  if(!el) return;
+  el.onclick = (e)=>{ e.preventDefault(); popProfileUrl(); hideWelderPage(); };
+}
+function navigateToWelderPage(idWelder, opts){
+  const w = findWelderByIdCI(idWelder);
+  if(!w){
+    // Deep link pointed at an ID that doesn't exist (typo, deleted welder, stray path) --
+    // show a clear "not found" page with a way back, rather than a blank/broken screen.
+    $('#welder-page').innerHTML = `
+      <div class="wp-not-found">
+        <h2>${L.wpNotFoundTitle}</h2>
+        <p class="muted">${L.wpNotFoundHint}</p>
+        <a href="/" id="wp-home-link" class="btn btn-primary">← ${L.backToHome}</a>
+      </div>`;
+    showWelderPage();
+    wireWelderPageHomeLink();
+    return;
+  }
+  if(!opts || opts.updateUrl!==false) pushProfileUrl(w.idWelder);
+  renderWelderPage(w);
+}
+function renderWelderPage(w){
+  const st = welderOverallStatus(w);
+  const avatarHtml = w.photo
+    ? `<img class="wp-photo" src="${w.photo}" alt="">`
+    : `<div class="wp-photo-fallback av-${st}">${esc(initialsFor(w.name))}</div>`;
+  let qrHtml = '';
+  try{
+    const dataUrl = renderQrDataUrl(buildQrPayload(w.idWelder), 150);
+    qrHtml = `<img src="${dataUrl}" alt="QR"><div class="small muted" style="margin-top:4px">${esc(L.qrScanHint)}</div>`;
+  }catch(e){ /* CDN script not loaded -- page still works without the QR image */ }
+  const certsHtml = w.certificates.length
+    ? w.certificates.map(c=>{
+        const cst = certStatus(c.validDate);
+        const fields = [
+          [L.fieldProcess, c.process], [L.fieldType, c.type],
+          ['Base material', c.baseMaterial], ['Filler material', c.fillerMaterial],
+          ['Thickness', c.thickness], ['Position', c.position],
+          [L.fieldTestDate, fmtDate(c.testDate)], [L.fieldValidDate, fmtDate(c.validDate)],
+          [L.fieldStandard, c.standard], ['Joint', c.joint],
+        ].filter(([,v])=>v);
+        const fieldsHtml = fields.map(([k,v])=>`<div><div class="k">${esc(k)}</div><div>${esc(v)}</div></div>`).join('');
+        const origHtml = c.originalCertImage
+          ? `<div class="wp-cert-orig"><div class="k">${esc(L.certOriginalTitle)}</div><img src="${c.originalCertImage}" alt="${esc(L.certOriginalTitle)}"></div>`
+          : `<div class="small muted">${esc(L.noOriginalFile)}</div>`;
+        const remarkHtml = c.remark ? `<div class="small muted" style="margin-top:6px">${esc(c.remark)}</div>` : '';
+        return `<div class="wp-cert-card">
+          <div class="wp-cert-head">
+            <b>${esc(c.process||'—')}${c.type ? ' · '+esc(c.type) : ''}</b>
+            ${statusBadge(cst)}
+          </div>
+          <div class="wp-cert-grid">${fieldsHtml}</div>
+          ${remarkHtml}
+          ${origHtml}
+        </div>`;
+      }).join('')
+    : `<div class="muted small">${L.noCertsRecorded}</div>`;
+  $('#welder-page').innerHTML = `
+    <div class="card wp-head">
+      ${avatarHtml}
+      <div style="flex:1;min-width:200px">
+        <h1 class="wp-name">${esc(w.name)}</h1>
+        <div class="wp-sub">${esc(w.idWelder)}${w.idEmployee ? ' · '+esc(L.colEmployeeId)+' '+esc(w.idEmployee) : ''}${w.company ? ' · '+esc(w.company) : ''}</div>
+        <div style="margin-top:6px">${statusBadge(st)}</div>
+        ${w.lastModified ? `<div class="small muted" style="margin-top:6px">${esc(L.profileUpdatedLabel)}: ${esc(fmtDateTime(new Date(w.lastModified)))}</div>` : ''}
+      </div>
+      <div class="wp-qr-col">${qrHtml}</div>
+    </div>
+    <div class="card">
+      <h2>${esc(L.certsSectionTitle)}</h2>
+      ${certsHtml}
+    </div>
+    <div class="row" style="margin-bottom:20px">
+      <a href="/" id="wp-home-link" class="btn btn-primary">← ${esc(L.backToHome)}</a>
+      <button type="button" class="btn" id="wp-print-btn">${esc(L.wpPrintBtn)}</button>
+    </div>
+  `;
+  showWelderPage();
+  wireWelderPageHomeLink();
+  $('#wp-print-btn').onclick = ()=> window.print();
 }
 function viewQr(idWelder){
   const w = WELDERS.find(x=>x.idWelder===idWelder);
   if(!w) return;
-  const dataUrl = renderQrDataUrl(buildQrPayload(idWelder), 260);
+  let imgHtml;
+  try{
+    const dataUrl = renderQrDataUrl(buildQrPayload(idWelder), 260);
+    imgHtml = `<img src="${dataUrl}" alt="QR" style="width:260px;height:260px">`;
+  }catch(e){
+    imgHtml = `<div class="muted small">${esc(L.loadError)}</div>`;
+  }
   $('#media-title').textContent = `${L.qrTitle} — ${w.name} (${w.idWelder})`;
-  $('#media-body').innerHTML = `<div class="qr-box"><img src="${dataUrl}" alt="QR" style="width:260px;height:260px"><div style="margin-top:8px;font-weight:700;font-size:15px">${esc(w.idWelder)}</div><div class="muted small">${esc(w.name)}</div></div>`;
+  $('#media-body').innerHTML = `<div class="qr-box">${imgHtml}<div style="margin-top:8px;font-weight:700;font-size:15px">${esc(w.idWelder)}</div><div class="muted small">${esc(w.name)}</div></div>`;
   $('#media-hint').textContent = L.qrHint;
   $('#media-overlay').classList.add('open');
 }
@@ -1476,25 +1558,17 @@ function bindStaticEvents(){
     btn.onclick = ()=> setTheme(btn.dataset.themeChoice);
   });
   $all('[data-close]').forEach(btn=>{
-    btn.onclick = ()=>{
-      $('#'+btn.dataset.close).classList.remove('open');
-      if(btn.dataset.close==='profile-overlay') popProfileUrl();
-    };
+    btn.onclick = ()=> $('#'+btn.dataset.close).classList.remove('open');
   });
   $all('.overlay').forEach(ov=>{
-    ov.addEventListener('click', e=>{
-      if(e.target===ov){
-        ov.classList.remove('open');
-        if(ov.id==='profile-overlay') popProfileUrl();
-      }
-    });
+    ov.addEventListener('click', e=>{ if(e.target===ov) ov.classList.remove('open'); });
   });
-  // Browser back/forward: reflect the URL change in the UI (open/close the profile modal
-  // to match) instead of leaving the modal state out of sync with the address bar.
+  // Browser back/forward: reflect the URL change in the UI (show/hide the standalone
+  // welder page to match) instead of leaving it out of sync with the address bar.
   window.addEventListener('popstate', ()=>{
-    const m = location.pathname.match(/^\/w\/([^/]+)$/);
-    if(m){ openProfile(decodeURIComponent(m[1]), {updateUrl:false}); }
-    else { $('#profile-overlay').classList.remove('open'); }
+    const id = deepLinkIdFromPath(location.pathname);
+    if(id){ navigateToWelderPage(id, {updateUrl:false}); }
+    else { hideWelderPage(); }
   });
   $('#confirm-cancel-btn').onclick = ()=> closeConfirmModal(null);
   $('#confirm-close-x').onclick = ()=> closeConfirmModal(null);
@@ -1507,11 +1581,9 @@ function bindStaticEvents(){
   };
   document.body.addEventListener('click', e=>{
     const openBtn = e.target.closest('[data-open-profile]');
-    if(openBtn){ openProfile(openBtn.dataset.openProfile); return; }
-    const viewCert = e.target.closest('[data-view-cert]');
-    if(viewCert){ viewCertImage(viewCert.dataset.viewCert, parseInt(viewCert.dataset.certIdx,10)); return; }
+    if(openBtn){ navigateToWelderPage(openBtn.dataset.openProfile); return; }
     const adminView = e.target.closest('[data-admin-view]');
-    if(adminView){ openProfile(adminView.dataset.adminView); return; }
+    if(adminView){ navigateToWelderPage(adminView.dataset.adminView); return; }
     const adminEdit = e.target.closest('[data-admin-edit]');
     if(adminEdit){ openWelderForm(adminEdit.dataset.adminEdit); return; }
     const adminQr = e.target.closest('[data-admin-qr]');
@@ -1575,11 +1647,10 @@ async function init(){
   await refreshSession();
   renderAll();
   activateTab(loadActiveTab());
-  // Deep link support: a QR code encodes .../w/<idWelder> -- if that's how this page was
-  // opened, jump straight to that welder's profile once data has loaded, on top of
-  // whichever tab was last open (usually Lookup, since that's where the public QR flow
-  // matters most).
-  const m = location.pathname.match(/^\/w\/([^/]+)$/);
-  if(m) openProfile(decodeURIComponent(m[1]), {updateUrl:false});
+  // Deep link support: a QR code encodes .../<idWelder> directly off the root -- if that's
+  // how this page was opened, show that welder's standalone page (not the tabs/lookup UI)
+  // as soon as data has loaded. This is the actual page a scan lands on, not a popup.
+  const deepId = deepLinkIdFromPath(location.pathname);
+  if(deepId) navigateToWelderPage(deepId, {updateUrl:false});
 }
 if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }

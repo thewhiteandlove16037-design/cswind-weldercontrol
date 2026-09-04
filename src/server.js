@@ -30,7 +30,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/reminders', reminderRoutes);
 
 // Static frontend (plain HTML/CSS/JS, no build step) + SPA fallback so a deep link like
-// /w/CS006 (a specific welder's profile, used by that welder's QR code) still serves
+// /cs006 (a specific welder's profile, used by that welder's QR code) still serves
 // index.html and lets the client-side router take over from the URL path.
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.get('*', (req, res, next) => {

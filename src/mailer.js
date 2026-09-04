@@ -77,7 +77,7 @@ function buildEmailBody(list, baseUrl) {
   const noDataLine = '(Không có chứng chỉ nào sắp/đã hết hạn. / None currently expiring or expired.)';
   const listBlock = list.length
     ? list.map((x, i) => {
-        const link = baseUrl ? ` — ${baseUrl.replace(/\/$/, '')}/w/${encodeURIComponent(x.idWelder)}` : '';
+        const link = baseUrl ? ` — ${baseUrl.replace(/\/$/, '')}/${encodeURIComponent(x.idWelder.toLowerCase())}` : '';
         return `${i + 1}. ${x.idWelder} · ${x.name} · ${x.process || '—'} · ${fmtDate(x.validDate)} · ${STATUS_LABEL[x.status]}${link}`;
       }).join('\n')
     : noDataLine;
