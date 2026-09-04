@@ -47,19 +47,33 @@ function entityLabel(code){
   const e = ENTITIES.find(x=>x.code===code);
   return e ? e.label : code;
 }
-function entityBarHtml(){
+function entityBarHtml(opts){
+  const allowDelete = !!(opts && opts.allowDelete);
   const buttons = ENTITIES.map(e=>
     `<button type="button" class="entity-btn ${e.code===activeEntity?'active':''}" data-entity="${esc(e.code)}">${esc(e.label)}</button>`
   ).join('');
-  const addBtn = (session && session.role==='superadmin')
-    ? `<button type="button" class="entity-btn entity-btn-add" id="entity-add-btn" title="${esc(L.entityAddBtn)}">${esc(L.entityAddBtn)}</button>`
-    : '';
-  return buttons + addBtn;
+  let extra = '';
+  if(session && session.role==='superadmin'){
+    extra += `<button type="button" class="entity-btn entity-btn-add" id="entity-add-btn" title="${esc(L.entityAddBtn)}">${esc(L.entityAddBtn)}</button>`;
+    // Deleting is a destructive management action -- only rendered on the Admin tab's bar
+    // (allowDelete), never on the public-facing Lookup tab's bar, even for a superadmin.
+    if(allowDelete){
+      // Guard against deleting an entity that still has welders in it (would orphan their
+      // records) or the last remaining entity -- disabled client-side with an explanatory
+      // title so a mistaken click never even reaches the server-side 409/400.
+      const inUse = weldersInActiveEntity().length > 0;
+      const onlyOne = ENTITIES.length <= 1;
+      const isDisabled = inUse || onlyOne;
+      const title = inUse ? L.entityDeleteDisabledInUse : (onlyOne ? L.entityDeleteDisabledLast : L.entityDeleteBtn);
+      extra += `<button type="button" class="entity-btn entity-btn-del" id="entity-del-btn" ${isDisabled?'disabled':''} title="${esc(title)}">${esc(L.entityDeleteBtn)}</button>`;
+    }
+  }
+  return buttons + extra;
 }
-function wireEntityBar(containerId){
+function wireEntityBar(containerId, opts){
   const el = $('#'+containerId);
   if(!el) return;
-  el.innerHTML = entityBarHtml();
+  el.innerHTML = entityBarHtml(opts);
   el.querySelectorAll('.entity-btn[data-entity]').forEach(btn=>{
     btn.onclick = ()=>{
       if(btn.dataset.entity === activeEntity) return;
@@ -71,6 +85,36 @@ function wireEntityBar(containerId){
   });
   const addBtn = el.querySelector('#entity-add-btn');
   if(addBtn) addBtn.onclick = addEntityFlow;
+  const delBtn = el.querySelector('#entity-del-btn');
+  if(delBtn) delBtn.onclick = deleteActiveEntityFlow;
+}
+async function deleteActiveEntityFlow(){
+  const code = activeEntity;
+  const label = entityLabel(code);
+  const ok = await openConfirmModal({
+    title: L.entityDeleteBtn,
+    message: L.entityDeleteConfirm(label),
+    confirmLabel: L.deleteBtn,
+    cancelLabel: L.cancelBtn,
+    danger: true,
+  });
+  if(!ok) return;
+  try{
+    await apiFetch('DELETE', '/api/entities/'+encodeURIComponent(code));
+    await loadEntities();
+    adminSelectedIds.clear();
+    toast(L.entityDeletedToast(label));
+    renderAll();
+  }catch(e){
+    if(handleWriteError(e)) return;
+    if(e.status===409 || (e.data && e.data.error==='entity_in_use')){
+      toast(L.entityInUseError((e.data && e.data.count) || 0));
+    }else if(e.status===400 || (e.data && e.data.error==='last_entity')){
+      toast(L.entityLastError);
+    }else{
+      toast(L.loadError);
+    }
+  }
 }
 async function addEntityFlow(){
   const code = await openConfirmModal({
@@ -253,6 +297,13 @@ const L_VI = {
   entityAddedToast: code=>`Đã thêm entity ${code}.`,
   fieldEntity: 'Entity',
   backToTopLabel: 'Về đầu trang',
+  entityDeleteBtn: 'Xoá entity',
+  entityDeleteConfirm: label=>`Xoá entity "${label}"? Hành động này không thể hoàn tác.`,
+  entityDeletedToast: label=>`Đã xoá entity ${label}.`,
+  entityInUseError: n=>`Không thể xoá — vẫn còn ${n} thợ hàn thuộc entity này. Hãy chuyển hoặc xoá các thợ hàn đó trước.`,
+  entityDeleteDisabledInUse: 'Không thể xoá — entity này vẫn còn thợ hàn. Chuyển hoặc xoá hết thợ hàn trong entity này trước.',
+  entityDeleteDisabledLast: 'Không thể xoá — đây là entity duy nhất còn lại.',
+  entityLastError: 'Không thể xoá — đây là entity duy nhất còn lại.',
 };
 const L_EN = {
   appTitle: 'CSWIND QR-ID Welder',
@@ -354,6 +405,13 @@ const L_EN = {
   entityAddedToast: code=>`Entity ${code} added.`,
   fieldEntity: 'Entity',
   backToTopLabel: 'Back to top',
+  entityDeleteBtn: 'Delete entity',
+  entityDeleteConfirm: label=>`Delete entity "${label}"? This cannot be undone.`,
+  entityDeletedToast: label=>`Entity ${label} deleted.`,
+  entityInUseError: n=>`Can't delete — ${n} welder(s) still belong to this entity. Move or delete them first.`,
+  entityDeleteDisabledInUse: "Can't delete — this entity still has welders in it. Move or delete them first.",
+  entityDeleteDisabledLast: "Can't delete — this is the last remaining entity.",
+  entityLastError: "Can't delete — this is the last remaining entity.",
 };
 let currentLang = 'vi';
 let L = L_VI;
@@ -939,7 +997,7 @@ function renderAdmin(){
     </div>
   `;
   $('#btn-logout').onclick = logoutAdmin;
-  wireEntityBar('entity-bar-admin');
+  wireEntityBar('entity-bar-admin', { allowDelete: true });
   if(session.role==='superadmin'){
     loadAccountsAndRender();
     $('#btn-create-account').onclick = createAccount;
