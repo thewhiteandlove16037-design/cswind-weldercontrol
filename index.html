@@ -143,6 +143,20 @@ input[type=file]{font-size:13px}
 .thumb-sm{width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
 .thumb-md{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
 .thumb-lg{width:56px;height:56px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+/* Standalone per-welder page (QR / deep link target) -- a full page, not a modal */
+.wp-head{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.wp-photo{width:88px;height:88px;border-radius:14px;object-fit:cover;border:1px solid var(--line);flex:none}
+.wp-photo-fallback{width:88px;height:88px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:32px;color:#fff;background:var(--brand)}
+.wp-name{font-size:22px;font-weight:800;margin:0 0 2px}
+.wp-sub{color:var(--muted);font-size:14px}
+.wp-qr-col{text-align:center}
+.wp-qr-col img{width:150px;height:150px;image-rendering:pixelated}
+.wp-cert-card{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;background:var(--card)}
+.wp-cert-card .wp-cert-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.wp-cert-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px 16px;font-size:13.5px;margin-bottom:10px}
+.wp-cert-grid .k{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.02em}
+.wp-cert-orig img{max-width:100%;border-radius:8px;border:1px solid var(--line);display:block;margin-top:6px}
+.wp-not-found{text-align:center;padding:60px 20px}
 @media (max-width:600px){ main{padding:10px} .stat{gap:8px} .cert-edit-grid{grid-template-columns:1fr} .session-badge{display:none} }
 </style>
 </head>
@@ -192,33 +206,14 @@ input[type=file]{font-size:13px}
     <div id="admin-panel-view" style="display:none"></div>
   </section>
 
+  <!-- Standalone per-welder page: what a QR code / deep link (baseUrl/<idWelder>) opens.
+       This is a genuinely separate page view, not a modal over the lookup grid -- the tabs
+       and lookup/admin sections are hidden while this is shown (see showWelderPage() in
+       app.js), so scanning a welder's QR code lands on nothing but their own profile. -->
+  <section id="welder-page" style="display:none"></section>
+
   <div class="footer-note" id="footer-note"></div>
 </main>
-
-<div class="overlay" id="profile-overlay">
-  <div class="modal">
-    <div class="modal-head">
-      <div class="row" style="align-items:center;gap:12px">
-        <img id="pm-photo" class="thumb-lg" style="display:none" alt="">
-        <div>
-          <h2 id="pm-name" style="margin-bottom:2px"></h2>
-          <div class="muted small" id="pm-sub"></div>
-          <div class="muted small" id="pm-updated"></div>
-        </div>
-      </div>
-      <button class="modal-close" data-close="profile-overlay">&times;</button>
-    </div>
-    <div class="qr-box" style="margin:8px 0 14px">
-      <img id="pm-qr-img" alt="QR">
-      <div class="small muted" id="pm-qr-hint" style="margin-top:6px"></div>
-    </div>
-    <div id="pm-certs"></div>
-    <div class="small muted" style="margin-top:10px" id="pm-link-line"></div>
-    <div class="modal-foot" style="justify-content:flex-start">
-      <a href="/" id="pm-home-link" class="btn btn-sm">← <span id="pm-home-label"></span></a>
-    </div>
-  </div>
-</div>
 
 <div class="overlay" id="media-overlay">
   <div class="modal">
