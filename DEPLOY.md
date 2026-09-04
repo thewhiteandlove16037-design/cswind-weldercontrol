@@ -196,9 +196,13 @@ Cách dùng:
   mới" cuối hàng nút (ở cả 2 tab). Bấm vào, nhập mã (vd `CSW-JP`, chỉ chữ/số/gạch ngang) rồi
   nhập tên hiển thị (vd `CSW Japan`) — entity mới xuất hiện ngay, không cần deploy lại.
   Tài khoản "editor" và "chỉ xem" không thấy nút này (không thể tự thêm entity).
-  Muốn đổi tên hay xoá bớt 7 entity mặc định (vd công ty không có chi nhánh CSW-PT), báo lại
-  Claude để bổ sung — hiện tại app chỉ hỗ trợ *thêm* entity mới từ giao diện, chưa hỗ trợ
-  sửa/xoá qua giao diện.
+- **Xoá entity tạo nhầm**: cũng chỉ superadmin thấy nút "Xoá entity" cạnh nút "+" — bấm vào
+  entity muốn xoá để chọn nó, rồi bấm "Xoá entity". Để tránh mất dữ liệu thợ hàn thật, nút này
+  **tự động bị khoá (mờ đi)** nếu entity đang chọn còn thợ hàn nào bên trong, hoặc nếu đó là
+  entity duy nhất còn lại — phải chuyển hết thợ hàn sang entity khác (sửa trong form thêm/sửa
+  thợ hàn, đổi ô "Entity") hoặc xoá hết thợ hàn đó trước, thì nút xoá entity mới bấm được.
+  Muốn đổi *tên* một entity đã có (không xoá), báo lại Claude để bổ sung — hiện tại giao diện
+  mới hỗ trợ thêm/xoá, chưa hỗ trợ đổi tên.
 - **Thêm/sửa thợ hàn**: khi mở form thêm/sửa thợ hàn ở tab Quản trị, có thêm ô chọn "Entity" —
   mặc định là entity đang chọn, có thể đổi sang entity khác ngay trong form nếu cần chuyển thợ
   hàn đó sang entity khác.
