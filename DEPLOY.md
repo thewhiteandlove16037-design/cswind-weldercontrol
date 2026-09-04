@@ -174,6 +174,42 @@ không cần mở trình duyệt, không cần Claude.
 (~$7/tháng, xem "Ghi chú về gói Render" cuối tài liệu) — khi đó app tự hẹn giờ chính xác bên
 trong, bước 7c ở trên trở thành dự phòng chứ không bắt buộc.
 
+## Bước 8 — Nhiều entity (CSW-VN, CSW-HQ, CSW-TR...)
+
+App giờ hỗ trợ nhiều "entity" (chi nhánh/công ty con) trong cùng một app, mỗi entity có dữ
+liệu thợ hàn riêng biệt, nhưng dùng chung một app/đường link/tài khoản đăng nhập.
+
+**Không cần làm gì để bật tính năng này** — khi deploy bản cập nhật, app tự tạo sẵn 7 entity
+mặc định: `CSW-VN` (CSW Việt Nam — nơi 260 thợ hàn hiện tại đang nằm), `CSW-HQ`, `CSW-TR`,
+`CSW-AM`, `CSW-CN`, `CSW-TW`, `CSW-PT`. Cả 260 thợ hàn hiện có tự động thuộc về `CSW-VN` —
+không có dữ liệu nào bị mất hay xáo trộn.
+
+Cách dùng:
+
+- **Tab Tra cứu**: một hàng nút entity (CSW-VN, CSW-HQ, ...) hiện phía trên khung tìm kiếm.
+  Bấm vào một entity để chỉ xem thợ hàn thuộc entity đó — số liệu thống kê, danh sách, bộ lọc
+  quy trình/công đoạn đều tự lọc theo entity đang chọn.
+- **Tab Quản trị**: sau khi đăng nhập, cùng một hàng nút entity hiện ở đầu trang — chọn entity
+  nào ở đây cũng đồng bộ với tab Tra cứu (chọn 1 nơi, áp dụng cả 2 nơi). Danh sách tổng, thêm/
+  sửa/xoá thợ hàn, nhập Excel... tất cả đều thao tác trên entity đang được chọn.
+- **Thêm entity mới**: chỉ tài khoản **Quản trị cấp cao** (superadmin) mới thấy nút "+ Entity
+  mới" cuối hàng nút (ở cả 2 tab). Bấm vào, nhập mã (vd `CSW-JP`, chỉ chữ/số/gạch ngang) rồi
+  nhập tên hiển thị (vd `CSW Japan`) — entity mới xuất hiện ngay, không cần deploy lại.
+  Tài khoản "editor" và "chỉ xem" không thấy nút này (không thể tự thêm entity).
+  Muốn đổi tên hay xoá bớt 7 entity mặc định (vd công ty không có chi nhánh CSW-PT), báo lại
+  Claude để bổ sung — hiện tại app chỉ hỗ trợ *thêm* entity mới từ giao diện, chưa hỗ trợ
+  sửa/xoá qua giao diện.
+- **Thêm/sửa thợ hàn**: khi mở form thêm/sửa thợ hàn ở tab Quản trị, có thêm ô chọn "Entity" —
+  mặc định là entity đang chọn, có thể đổi sang entity khác ngay trong form nếu cần chuyển thợ
+  hàn đó sang entity khác.
+- **Mã thợ hàn (ID) vẫn phải là duy nhất trên toàn bộ hệ thống**, không phân biệt theo entity —
+  hai entity khác nhau không thể có cùng một mã thợ hàn (vd `CS006` chỉ tồn tại ở một entity).
+- **QR code / link riêng của từng thợ hàn không đổi** — vẫn theo mã thợ hàn
+  (`.../<mã thợ hàn>`), không phân biệt entity trong đường link.
+- **Lưu ý về email nhắc nhở tự động (Bước 7)**: email nhắc nhở hàng tuần hiện vẫn gửi chung
+  cho *tất cả* các entity trong một email duy nhất, chưa tách riêng theo từng entity. Nếu cần
+  tách email riêng theo entity (vd CSW-HQ tự nhận email riêng), báo lại Claude để bổ sung.
+
 ## Việc cần làm sau khi deploy xong
 
 - [ ] Đổi mật khẩu tài khoản `admin` mặc định (hoặc tạo superadmin mới, xoá tài khoản mặc định)
@@ -186,6 +222,8 @@ trong, bước 7c ở trên trở thành dự phòng chứ không bắt buộc.
 - [ ] Test thử luồng khách hàng: quét mã QR (hoặc mở link tra cứu) mà không đăng nhập, xác
       nhận xem được thông tin chứng chỉ — quét QR giờ sẽ mở thẳng trang riêng của thợ hàn đó
 - [ ] Cấu hình email nhắc nhở tự động (Bước 7), bấm "Gửi thử ngay" để xác nhận hoạt động
+- [ ] Nếu công ty có nhiều chi nhánh (CSW-HQ, CSW-TR...), thử bấm qua lại các nút entity ở tab
+      Tra cứu/Quản trị (Bước 8) để quen với cách chuyển đổi
 
 ## Ghi chú về gói Render (Free vs trả phí)
 

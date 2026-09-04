@@ -12,6 +12,7 @@ const welderRoutes = require('./routes/welders');
 const accountRoutes = require('./routes/accounts');
 const settingsRoutes = require('./routes/settings');
 const reminderRoutes = require('./routes/reminders');
+const entityRoutes = require('./routes/entities');
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use('/api/welders', welderRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/reminders', reminderRoutes);
+app.use('/api/entities', entityRoutes);
 
 // Static frontend (plain HTML/CSS/JS, no build step) + SPA fallback so a deep link like
 // /cs006 (a specific welder's profile, used by that welder's QR code) still serves

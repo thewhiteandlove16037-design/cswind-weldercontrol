@@ -23,7 +23,7 @@ function certRowToJson(c) {
 
 async function fetchAllWelders() {
   const { rows: welders } = await pool.query(
-    'SELECT id_welder, name, id_employee, company, photo, last_modified FROM welders ORDER BY id_welder'
+    'SELECT id_welder, name, id_employee, company, photo, entity, last_modified FROM welders ORDER BY id_welder'
   );
   const { rows: certs } = await pool.query(
     'SELECT * FROM certificates ORDER BY welder_id, sort_order, id'
@@ -39,6 +39,7 @@ async function fetchAllWelders() {
     idEmployee: w.id_employee || '',
     company: w.company || '',
     photo: w.photo || undefined,
+    entity: w.entity || 'CSW-VN',
     lastModified: w.last_modified,
     certificates: certsByWelder.get(w.id_welder) || [],
   }));
@@ -95,7 +96,7 @@ async function logAudit(client, accountName, action, welderId, detail) {
 
 // Create -- editor or superadmin.
 router.post('/', requireRole('editor'), async (req, res) => {
-  const { idWelder, name, idEmployee, company, photo, certificates } = req.body || {};
+  const { idWelder, name, idEmployee, company, photo, entity, certificates } = req.body || {};
   if (!idWelder || !name) return res.status(400).json({ error: 'missing_fields' });
   const client = await pool.connect();
   try {
@@ -106,8 +107,8 @@ router.post('/', requireRole('editor'), async (req, res) => {
       return res.status(409).json({ error: 'already_exists' });
     }
     await client.query(
-      'INSERT INTO welders (id_welder, name, id_employee, company, photo) VALUES ($1,$2,$3,$4,$5)',
-      [idWelder, name, idEmployee || null, company || null, photo || null]
+      'INSERT INTO welders (id_welder, name, id_employee, company, photo, entity) VALUES ($1,$2,$3,$4,$5,$6)',
+      [idWelder, name, idEmployee || null, company || null, photo || null, entity || 'CSW-VN']
     );
     await writeCertificates(client, idWelder, certificates);
     await logAudit(client, req.user.username, 'create', idWelder, name);
@@ -125,15 +126,15 @@ router.post('/', requireRole('editor'), async (req, res) => {
 // Update -- editor or superadmin.
 router.put('/:idWelder', requireRole('editor'), async (req, res) => {
   const idWelder = req.params.idWelder;
-  const { name, idEmployee, company, photo, certificates } = req.body || {};
+  const { name, idEmployee, company, photo, entity, certificates } = req.body || {};
   if (!name) return res.status(400).json({ error: 'missing_fields' });
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const result = await client.query(
-      `UPDATE welders SET name=$2, id_employee=$3, company=$4, photo=$5, last_modified=now()
+      `UPDATE welders SET name=$2, id_employee=$3, company=$4, photo=$5, entity=$6, last_modified=now()
        WHERE id_welder=$1`,
-      [idWelder, name, idEmployee || null, company || null, photo || null]
+      [idWelder, name, idEmployee || null, company || null, photo || null, entity || 'CSW-VN']
     );
     if (!result.rowCount) {
       await client.query('ROLLBACK');

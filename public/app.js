@@ -21,6 +21,94 @@ function loadActiveTab(){
   try{ return localStorage.getItem(ACTIVE_TAB_KEY) || 'lookup'; }catch(e){ return 'lookup'; }
 }
 
+/* ================= MULTI-ENTITY (CSW-VN / CSW-HQ / ...) =================
+   One shared activeEntity drives BOTH the Lookup tab and the Admin tab -- switching
+   entity in either place switches it everywhere, which is what keeps "Admin edits mirror
+   Lookup" true without duplicating state. Welder IDs stay globally unique across entities;
+   only the visible slice of WELDERS changes. */
+let ENTITIES = []; // [{code,label}], loaded from GET /api/entities
+const ACTIVE_ENTITY_KEY = 'cswind_active_entity';
+let activeEntity = 'CSW-VN';
+function saveActiveEntity(code){
+  try{ localStorage.setItem(ACTIVE_ENTITY_KEY, code); }catch(e){}
+}
+function loadActiveEntityPref(){
+  try{ return localStorage.getItem(ACTIVE_ENTITY_KEY) || 'CSW-VN'; }catch(e){ return 'CSW-VN'; }
+}
+async function loadEntities(){
+  ENTITIES = await apiFetch('GET', '/api/entities');
+  const saved = loadActiveEntityPref();
+  activeEntity = ENTITIES.some(e=>e.code===saved) ? saved : (ENTITIES[0] ? ENTITIES[0].code : 'CSW-VN');
+}
+function weldersInActiveEntity(){
+  return WELDERS.filter(w => (w.entity || 'CSW-VN') === activeEntity);
+}
+function entityLabel(code){
+  const e = ENTITIES.find(x=>x.code===code);
+  return e ? e.label : code;
+}
+function entityBarHtml(){
+  const buttons = ENTITIES.map(e=>
+    `<button type="button" class="entity-btn ${e.code===activeEntity?'active':''}" data-entity="${esc(e.code)}">${esc(e.label)}</button>`
+  ).join('');
+  const addBtn = (session && session.role==='superadmin')
+    ? `<button type="button" class="entity-btn entity-btn-add" id="entity-add-btn" title="${esc(L.entityAddBtn)}">${esc(L.entityAddBtn)}</button>`
+    : '';
+  return buttons + addBtn;
+}
+function wireEntityBar(containerId){
+  const el = $('#'+containerId);
+  if(!el) return;
+  el.innerHTML = entityBarHtml();
+  el.querySelectorAll('.entity-btn[data-entity]').forEach(btn=>{
+    btn.onclick = ()=>{
+      if(btn.dataset.entity === activeEntity) return;
+      activeEntity = btn.dataset.entity;
+      saveActiveEntity(activeEntity);
+      adminSelectedIds.clear();
+      renderAll();
+    };
+  });
+  const addBtn = el.querySelector('#entity-add-btn');
+  if(addBtn) addBtn.onclick = addEntityFlow;
+}
+async function addEntityFlow(){
+  const code = await openConfirmModal({
+    title: L.entityAddBtn,
+    message: L.entityAddCodePrompt,
+    showInput: true,
+    inputPlaceholder: L.entityAddCodePlaceholder,
+    confirmLabel: L.saveBtn,
+    cancelLabel: L.cancelBtn,
+  });
+  if(code==null) return;
+  const cleanCode = code.trim();
+  if(!cleanCode){ toast(L.entityCodeRequiredError); return; }
+  if(!/^[A-Za-z0-9][A-Za-z0-9-]{0,19}$/.test(cleanCode)){ toast(L.entityInvalidCodeError); return; }
+  const label = await openConfirmModal({
+    title: L.entityAddBtn,
+    message: L.entityAddLabelPrompt,
+    showInput: true,
+    inputPlaceholder: L.entityAddLabelPlaceholder,
+    confirmLabel: L.saveBtn,
+    cancelLabel: L.cancelBtn,
+  });
+  if(label==null) return;
+  try{
+    const created = await apiFetch('POST', '/api/entities', { code: cleanCode, label: label.trim() || cleanCode });
+    await loadEntities();
+    activeEntity = created.code;
+    saveActiveEntity(activeEntity);
+    toast(L.entityAddedToast(created.code));
+    renderAll();
+  }catch(e){
+    if(handleWriteError(e)) return;
+    if(e.status===409 || (e.data && e.data.error==='already_exists')) toast(L.entityExistsError);
+    else if(e.data && e.data.error==='invalid_code') toast(L.entityInvalidCodeError);
+    else toast(L.loadError);
+  }
+}
+
 let lkStatus = '', lkProcess = '', lkJoint = ''; // Lookup tab filter state
 let adminSelectedIds = new Set(); // Master List: checked rows, keyed by idWelder
 let adminSortKey = 'idWelder', adminSortDir = 'asc'; // Master List: current sort column/direction
@@ -115,7 +203,7 @@ const L_VI = {
   welderUpdatedToast: idw=>`Đã lưu ${idw}.`,
   welderDeletedToast: idw=>`Đã xoá ${idw}.`,
   readOnlyBanner: 'Bạn đang xem ở chế độ chỉ đọc — thay đổi sẽ không được lưu lại. Liên hệ quản trị viên để được cấp quyền chỉnh sửa.',
-  footerNote: (date,n)=>`CSWIND Việt Nam · Dữ liệu thợ hàn cập nhật đến ${date} · ${n} thợ hàn`,
+  footerNote: (date,n,entityName)=>`${entityName} · Dữ liệu thợ hàn cập nhật đến ${date} · ${n} thợ hàn`,
   welderFormTitleAdd: 'Thêm thợ hàn mới', welderFormTitleEdit: idw=>`Sửa hồ sơ — ${idw}`,
   fieldCode: 'Mã thợ hàn', fieldName: 'Họ và tên', fieldEmployeeId: 'Mã nhân viên', fieldCompany: 'Công ty',
   certsSectionTitle: 'Chứng chỉ', addCertBtn: '+ Thêm chứng chỉ', removeCertBtn: 'Xoá',
@@ -154,6 +242,17 @@ const L_VI = {
   selectedCount: n=>`Đã chọn ${n}`, deleteSelectedBtn: 'Xoá mục đã chọn', refreshBtn: 'Làm mới',
   confirmDeleteSelected: n=>`Xoá ${n} thợ hàn đã chọn? Hành động này không thể hoàn tác.`,
   deleteSelectedTitle: n=>`Xoá ${n} thợ hàn`, selectedDeletedToast: n=>`Đã xoá ${n} thợ hàn.`,
+  entityAddBtn: '+ Entity mới',
+  entityAddCodePrompt: 'Nhập mã entity mới (vd: CSW-JP):',
+  entityAddCodePlaceholder: 'CSW-JP',
+  entityAddLabelPrompt: 'Nhập tên hiển thị cho entity này:',
+  entityAddLabelPlaceholder: 'CSW Japan',
+  entityCodeRequiredError: 'Vui lòng nhập mã entity.',
+  entityInvalidCodeError: 'Mã entity không hợp lệ — chỉ dùng chữ, số và dấu gạch ngang (tối đa 20 ký tự).',
+  entityExistsError: 'Mã entity này đã tồn tại.',
+  entityAddedToast: code=>`Đã thêm entity ${code}.`,
+  fieldEntity: 'Entity',
+  backToTopLabel: 'Về đầu trang',
 };
 const L_EN = {
   appTitle: 'CSWIND QR-ID Welder',
@@ -205,7 +304,7 @@ const L_EN = {
   welderUpdatedToast: idw=>`${idw} saved.`,
   welderDeletedToast: idw=>`${idw} deleted.`,
   readOnlyBanner: 'You are viewing in read-only mode — changes will not be saved. Contact an admin for edit access.',
-  footerNote: (date,n)=>`CSWIND Vietnam · Welder data current as of ${date} · ${n} welders`,
+  footerNote: (date,n,entityName)=>`${entityName} · Welder data current as of ${date} · ${n} welders`,
   welderFormTitleAdd: 'Add new welder', welderFormTitleEdit: idw=>`Edit profile — ${idw}`,
   fieldCode: 'Welder ID', fieldName: 'Full name', fieldEmployeeId: 'Employee ID', fieldCompany: 'Company',
   certsSectionTitle: 'Certificates', addCertBtn: '+ Add certificate', removeCertBtn: 'Remove',
@@ -244,6 +343,17 @@ const L_EN = {
   selectedCount: n=>`${n} selected`, deleteSelectedBtn: 'Delete selected', refreshBtn: 'Refresh',
   confirmDeleteSelected: n=>`Delete ${n} selected welder(s)? This cannot be undone.`,
   deleteSelectedTitle: n=>`Delete ${n} welder(s)`, selectedDeletedToast: n=>`${n} welder(s) deleted.`,
+  entityAddBtn: '+ New entity',
+  entityAddCodePrompt: 'Enter the new entity code (e.g. CSW-JP):',
+  entityAddCodePlaceholder: 'CSW-JP',
+  entityAddLabelPrompt: 'Enter a display name for this entity:',
+  entityAddLabelPlaceholder: 'CSW Japan',
+  entityCodeRequiredError: 'Please enter an entity code.',
+  entityInvalidCodeError: 'Invalid entity code — letters, numbers and hyphens only (max 20 characters).',
+  entityExistsError: 'This entity code already exists.',
+  entityAddedToast: code=>`Entity ${code} added.`,
+  fieldEntity: 'Entity',
+  backToTopLabel: 'Back to top',
 };
 let currentLang = 'vi';
 let L = L_VI;
@@ -265,6 +375,8 @@ function renderStaticText(){
   $('.theme-btn[data-theme-choice="light"]').textContent = L.themeLight;
   $('.theme-btn[data-theme-choice="dark"]').textContent = L.themeDark;
   $('.theme-btn[data-theme-choice="system"]').textContent = L.themeSystem;
+  if($('#back-to-top')) $('#back-to-top').title = L.backToTopLabel;
+  if($('#back-to-top')) $('#back-to-top').setAttribute('aria-label', L.backToTopLabel);
   renderSessionBadge();
 }
 
@@ -526,11 +638,12 @@ async function logoutAdmin(){
 /* ================= RENDER: PUBLIC LOOKUP ================= */
 function computeStats(){
   let ok=0, warn=0, bad=0;
-  WELDERS.forEach(w=>{
+  const list = weldersInActiveEntity();
+  list.forEach(w=>{
     const st = welderOverallStatus(w);
     if(st==='ok') ok++; else if(st==='warn') warn++; else if(st==='bad') bad++;
   });
-  return {total: WELDERS.length, ok, warn, bad};
+  return {total: list.length, ok, warn, bad};
 }
 function renderStats(){
   const s = computeStats();
@@ -543,7 +656,7 @@ function renderStats(){
 }
 function distinctJoints(){
   const set = new Set();
-  WELDERS.forEach(w=> w.certificates.forEach(c=>{
+  weldersInActiveEntity().forEach(w=> w.certificates.forEach(c=>{
     const j = (c.joint||'').trim();
     if(j && j!=='#N/A') set.add(j);
   }));
@@ -569,7 +682,7 @@ function renderLookupFilterBar(){
 function renderPublicGrid(){
   const q = ($('#search-box').value||'').trim().toLowerCase();
   const grid = $('#public-grid');
-  const list = WELDERS.filter(w=>{
+  const list = weldersInActiveEntity().filter(w=>{
     const st = welderOverallStatus(w);
     if(lkStatus && st !== lkStatus) return false;
     if(lkProcess && !w.certificates.some(c=>(c.process||'').trim()===lkProcess)) return false;
@@ -762,6 +875,8 @@ function renderAdmin(){
       <button class="btn btn-sm" id="btn-logout">${L.logoutBtn}</button>
     </div>
 
+    <div class="entity-bar" id="entity-bar-admin"></div>
+
     ${session.role==='superadmin' ? `
     <div class="card">
       <h2>${L.settingsTitle}</h2>
@@ -795,7 +910,7 @@ function renderAdmin(){
     </div>
 
     <div class="card">
-      <h2>${L.masterListTitle(WELDERS.length)}</h2>
+      <h2>${L.masterListTitle(weldersInActiveEntity().length)}</h2>
       <div class="row" style="margin-bottom:10px">
         <input type="text" id="admin-search" placeholder="${L.masterSearchPlaceholder}" style="max-width:240px">
         <select id="admin-filter-status" style="max-width:180px">
@@ -824,6 +939,7 @@ function renderAdmin(){
     </div>
   `;
   $('#btn-logout').onclick = logoutAdmin;
+  wireEntityBar('entity-bar-admin');
   if(session.role==='superadmin'){
     loadAccountsAndRender();
     $('#btn-create-account').onclick = createAccount;
@@ -886,7 +1002,7 @@ function renderAdmin(){
 }
 function distinctProcesses(){
   const set = new Set();
-  WELDERS.forEach(w=> w.certificates.forEach(c=>{ if(c.process) set.add(c.process.trim()); }));
+  weldersInActiveEntity().forEach(w=> w.certificates.forEach(c=>{ if(c.process) set.add(c.process.trim()); }));
   return Array.from(set).sort();
 }
 
@@ -1034,7 +1150,7 @@ function renderReminderPanel(){
 }
 function expiringList(){
   const out = [];
-  WELDERS.forEach(w=>{
+  weldersInActiveEntity().forEach(w=>{
     w.certificates.forEach(c=>{
       const st = certStatus(c.validDate);
       if(st==='warn' || st==='bad'){
@@ -1155,7 +1271,7 @@ function renderAdminTable(){
   const q = ($('#admin-search') && $('#admin-search').value || '').trim().toLowerCase();
   const filterSt = ($('#admin-filter-status') && $('#admin-filter-status').value) || '';
   const filterProc = ($('#admin-filter-process') && $('#admin-filter-process').value) || '';
-  const list = WELDERS.filter(w=>{
+  const list = weldersInActiveEntity().filter(w=>{
     if(filterSt && welderOverallStatus(w) !== filterSt) return false;
     if(filterProc && !w.certificates.some(c=>(c.process||'').trim()===filterProc)) return false;
     if(!q) return true;
@@ -1248,6 +1364,9 @@ function openWelderForm(idWelder){
     <div class="field"><label>${L.fieldName}</label><input type="text" id="wf-name" value="${esc(w?w.name:'')}"></div>
     <div class="field"><label>${L.fieldEmployeeId}</label><input type="text" id="wf-empid" value="${esc(w?w.idEmployee||'':'')}"></div>
     <div class="field"><label>${L.fieldCompany}</label><input type="text" id="wf-company" value="${esc(w?w.company||'CSWIND Việt Nam':'CSWIND Việt Nam')}"></div>
+    <div class="field"><label>${L.fieldEntity}</label>
+      <select id="wf-entity">${ENTITIES.map(e=>`<option value="${esc(e.code)}" ${(w?w.entity:activeEntity)===e.code?'selected':''}>${esc(e.label)}</option>`).join('')}</select>
+    </div>
     <div class="field">
       <label>${L.fieldPhoto}</label>
       <div class="row" style="align-items:center;gap:10px">
@@ -1352,7 +1471,8 @@ async function saveWelderForm(){
       });
     }
   }
-  const payload = { idWelder: code, name, idEmployee: empid, company, photo: wfPhoto || '', certificates: certs };
+  const entity = ($('#wf-entity') && $('#wf-entity').value) || activeEntity;
+  const payload = { idWelder: code, name, idEmployee: empid, company, entity, photo: wfPhoto || '', certificates: certs };
   const saveBtn = $('#wf-save');
   saveBtn.disabled = true;
   try{
@@ -1519,6 +1639,7 @@ async function runImport(){
       name: incoming.name || (existing ? existing.name : ''),
       idEmployee: incoming.idEmployee || (existing ? existing.idEmployee : ''),
       company: existing ? existing.company : incoming.company,
+      entity: existing ? existing.entity : activeEntity,
       photo: existing ? (existing.photo || '') : '',
       certificates: incoming.certificates,
     };
@@ -1551,6 +1672,7 @@ function bindStaticEvents(){
     };
   });
   $('#search-box').oninput = renderPublicGrid;
+  if($('#back-to-top')) $('#back-to-top').onclick = ()=> window.scrollTo({top:0, behavior:'smooth'});
   $all('.lang-btn').forEach(btn=>{
     btn.onclick = ()=> setLang(btn.dataset.lang);
   });
@@ -1627,11 +1749,12 @@ function activateTab(tab){
   $('#tab-admin').style.display = tab==='admin' ? 'block' : 'none';
 }
 function renderAll(){
+  wireEntityBar('entity-bar-lookup');
   renderStats();
   renderLookupFilterBar();
   renderPublicGrid();
   renderAdmin();
-  $('#footer-note').textContent = L.footerNote(fmtDate(SETTINGS.dataAsOf||todayISO()), WELDERS.length);
+  $('#footer-note').textContent = L.footerNote(fmtDate(SETTINGS.dataAsOf||todayISO()), weldersInActiveEntity().length, entityLabel(activeEntity));
 }
 async function init(){
   loadThemePref();
@@ -1640,7 +1763,7 @@ async function init(){
   renderStaticText();
   renderClock();
   try{
-    await Promise.all([ loadWelders(), loadSettings() ]);
+    await Promise.all([ loadWelders(), loadSettings(), loadEntities() ]);
   }catch(e){
     toast(L.loadError);
   }
