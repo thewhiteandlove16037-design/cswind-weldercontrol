@@ -95,6 +95,10 @@ const L_VI = {
   reminderPreviewCount: n=>`${n} chứng chỉ sắp/đã hết hạn sẽ được đưa vào email.`,
   reminderPreviewNone: 'Hiện không có chứng chỉ nào sắp hoặc đã hết hạn.',
   reminderComposeBtn: 'Soạn email nhắc nhở', reminderSentToast: 'Đã mở email nhắc nhở — kiểm tra ứng dụng email của bạn.',
+  reminderSendNowBtn: 'Gửi thử ngay (email thật)',
+  reminderSentNowToast: n=>`Đã gửi email nhắc nhở thật (${n} chứng chỉ sắp/đã hết hạn).`,
+  reminderAutoConfigured: '✓ Đã cấu hình gửi tự động hàng tuần (thứ 2).',
+  reminderAutoNotConfigured: 'Chưa cấu hình gửi email tự động — cần thêm biến môi trường SMTP trên Render (xem DEPLOY.md).',
   reminderSubjectLabel: 'Tiêu đề', reminderBodyLabel: 'Nội dung',
   reminderNoEmailsToast: 'Chưa có email người nhận — thêm trong Cài đặt.',
   masterListTitle: n=>`Danh sách tổng (${n} thợ hàn)`,
@@ -179,6 +183,10 @@ const L_EN = {
   reminderPreviewCount: n=>`${n} expiring/expired certificate(s) will be included.`,
   reminderPreviewNone: 'No certificates are currently expiring or expired.',
   reminderComposeBtn: 'Compose reminder email', reminderSentToast: 'Reminder email opened — check your email app.',
+  reminderSendNowBtn: 'Send test now (real email)',
+  reminderSentNowToast: n=>`Real reminder email sent (${n} expiring/expired certificate(s)).`,
+  reminderAutoConfigured: '✓ Automatic weekly (Monday) sending is configured.',
+  reminderAutoNotConfigured: 'Automatic email sending isn\'t configured yet — add SMTP environment variables on Render (see DEPLOY.md).',
   reminderSubjectLabel: 'Subject', reminderBodyLabel: 'Body',
   reminderNoEmailsToast: 'No recipient email — add one in Settings.',
   masterListTitle: n=>`Master list (${n} welders)`,
@@ -394,7 +402,31 @@ function renderSessionBadge(){
   el.innerHTML = `${esc(session.name)} <span class="role-pill r-${esc(session.role)}">${esc(roleLabel(session.role))}</span>`;
 }
 
+/* ================= DEEP LINKS (per-welder shareable URL, used by QR codes) =================
+   Each welder gets their own URL: <baseUrl>/w/<idWelder>. Scanning that welder's QR code
+   (or clicking their entry in the lookup grid) opens this app straight to their profile,
+   always showing live data from the server -- not a static snapshot. */
+function welderDeepLink(idWelder){
+  const base = (SETTINGS.baseUrl||'').trim();
+  if(!base) return '';
+  return base.replace(/\/+$/,'') + '/w/' + encodeURIComponent(idWelder);
+}
+function pushProfileUrl(idWelder){
+  try{ history.pushState({idWelder}, '', '/w/'+encodeURIComponent(idWelder)); }catch(e){}
+}
+function popProfileUrl(){
+  try{ if(location.pathname!=='/') history.pushState({}, '', '/'); }catch(e){}
+}
+
 /* ================= QR ================= */
+function buildQrPayload(idWelder){
+  const link = welderDeepLink(idWelder);
+  // A real URL is the primary payload now (item requested: scanning opens that welder's
+  // own live page) -- with the scheme included so any camera app offers to open it directly.
+  // Falls back to the old offline info-text blob only when no Base URL is set yet in
+  // Settings (first-time setup), so the QR feature isn't simply broken before that's done.
+  return link || buildQrInfoText(idWelder);
+}
 function buildQrInfoText(idWelder){
   const w = WELDERS.find(x=>x.idWelder===idWelder);
   if(!w) return idWelder;
@@ -539,7 +571,7 @@ function renderPublicGrid(){
     return `<div class="wcard st-${st}" data-open-profile="${esc(w.idWelder)}">
       ${avatar}
       <div class="wcard-body">
-        <div class="idw">${esc(w.idWelder)}</div>
+        <div class="idw">${esc(w.idWelder)}${w.idEmployee ? ` <span class="muted" style="font-weight:600">· ${L.colEmployeeId} ${esc(w.idEmployee)}</span>` : ''}</div>
         <div class="nm">${esc(w.name)}</div>
         ${statusBadge(st)}
         <div class="small muted" style="margin-top:6px">${w.certificates.length} ${L.certsSuffix}</div>
@@ -549,7 +581,7 @@ function renderPublicGrid(){
 }
 
 /* ================= PROFILE MODAL ================= */
-function openProfile(idWelder){
+function openProfile(idWelder, opts){
   const w = WELDERS.find(x=>x.idWelder===idWelder);
   if(!w) return;
   $('#pm-name').textContent = w.name;
@@ -557,12 +589,13 @@ function openProfile(idWelder){
   const pmPhoto = $('#pm-photo');
   if(w.photo){ pmPhoto.src = w.photo; pmPhoto.style.display = ''; } else { pmPhoto.src = ''; pmPhoto.style.display = 'none'; }
   $('#pm-updated').textContent = w.lastModified ? `${L.profileUpdatedLabel}: ${fmtDateTime(new Date(w.lastModified))}` : '';
-  $('#pm-qr-img').src = renderQrDataUrl(buildQrInfoText(idWelder), 220);
+  $('#pm-qr-img').src = renderQrDataUrl(buildQrPayload(idWelder), 220);
   $('#pm-qr-hint').textContent = L.qrScanHint;
   $('#pm-certs').innerHTML = renderCertsTable(w);
-  const link = (SETTINGS.baseUrl||'').trim();
+  const link = welderDeepLink(idWelder);
   $('#pm-link-line').innerHTML = link ? `${L.seeFullProfile}: <a href="${esc(link)}" target="_blank" rel="noopener">${esc(link)}</a>` : '';
   $('#profile-overlay').classList.add('open');
+  if(!opts || opts.updateUrl!==false) pushProfileUrl(idWelder);
 }
 function renderCertsTable(w){
   if(!w.certificates.length) return `<div class="muted small">${L.noCertsRecorded}</div>`;
@@ -593,7 +626,7 @@ function viewCertImage(idWelder, certIdx){
 function viewQr(idWelder){
   const w = WELDERS.find(x=>x.idWelder===idWelder);
   if(!w) return;
-  const dataUrl = renderQrDataUrl(buildQrInfoText(idWelder), 260);
+  const dataUrl = renderQrDataUrl(buildQrPayload(idWelder), 260);
   $('#media-title').textContent = `${L.qrTitle} — ${w.name} (${w.idWelder})`;
   $('#media-body').innerHTML = `<div class="qr-box"><img src="${dataUrl}" alt="QR" style="width:260px;height:260px"><div style="margin-top:8px;font-weight:700;font-size:15px">${esc(w.idWelder)}</div><div class="muted small">${esc(w.name)}</div></div>`;
   $('#media-hint').textContent = L.qrHint;
@@ -672,7 +705,11 @@ function renderAdmin(){
       <h2 style="margin-top:18px">${L.reminderTitle}</h2>
       <div id="reminder-recipients-line" class="small muted" style="margin-bottom:8px"></div>
       <div id="reminder-preview" class="small" style="margin-bottom:8px"></div>
-      <button class="btn btn-primary" id="btn-compose-email">${L.reminderComposeBtn}</button>
+      <div class="row" style="gap:8px">
+        <button class="btn btn-primary" id="btn-compose-email">${L.reminderComposeBtn}</button>
+        ${session.role==='superadmin' ? `<button class="btn write-action" id="btn-send-reminder-now">${L.reminderSendNowBtn}</button>` : ''}
+      </div>
+      ${session.role==='superadmin' ? `<div class="small muted" id="reminder-auto-status" style="margin-top:8px">…</div>` : ''}
     </div>
 
     <div class="card">
@@ -725,6 +762,8 @@ function renderAdmin(){
   renderReminderPanel();
   renderExpiringTable();
   $('#btn-compose-email').onclick = composeReminderEmail;
+  if($('#btn-send-reminder-now')) $('#btn-send-reminder-now').onclick = sendReminderNow;
+  if($('#reminder-auto-status')) refreshReminderAutoStatus();
   $('#admin-search').oninput = renderAdminTable;
   $('#admin-filter-status').onchange = renderAdminTable;
   $('#admin-filter-process').onchange = renderAdminTable;
@@ -992,6 +1031,31 @@ function composeReminderEmail(){
   }
   openMailto(mailto);
   toast(L.reminderSentToast);
+}
+// "Gửi thử ngay" -- sends the same reminder for real, right now, via the server's SMTP
+// mailbox (not this browser's mail client). Lets a superadmin verify the weekly automated
+// send actually works without waiting for next Monday.
+async function refreshReminderAutoStatus(){
+  const el = $('#reminder-auto-status');
+  if(!el) return;
+  try{
+    const s = await apiFetch('GET', '/api/reminders/status');
+    el.textContent = s.configured ? L.reminderAutoConfigured : L.reminderAutoNotConfigured;
+  }catch(e){ el.textContent = ''; }
+}
+async function sendReminderNow(){
+  const btn = $('#btn-send-reminder-now');
+  if(btn) btn.disabled = true;
+  try{
+    const result = await apiFetch('POST', '/api/reminders/send', {});
+    toast(L.reminderSentNowToast(result.count));
+  }catch(e){
+    if(!handleWriteError(e)){
+      toast((e.data && e.data.message) || L.loadError);
+    }
+  }finally{
+    if(btn) btn.disabled = isReadOnlyNow();
+  }
 }
 
 /* ================= MASTER LIST TABLE ================= */
@@ -1412,10 +1476,25 @@ function bindStaticEvents(){
     btn.onclick = ()=> setTheme(btn.dataset.themeChoice);
   });
   $all('[data-close]').forEach(btn=>{
-    btn.onclick = ()=> $('#'+btn.dataset.close).classList.remove('open');
+    btn.onclick = ()=>{
+      $('#'+btn.dataset.close).classList.remove('open');
+      if(btn.dataset.close==='profile-overlay') popProfileUrl();
+    };
   });
   $all('.overlay').forEach(ov=>{
-    ov.addEventListener('click', e=>{ if(e.target===ov) ov.classList.remove('open'); });
+    ov.addEventListener('click', e=>{
+      if(e.target===ov){
+        ov.classList.remove('open');
+        if(ov.id==='profile-overlay') popProfileUrl();
+      }
+    });
+  });
+  // Browser back/forward: reflect the URL change in the UI (open/close the profile modal
+  // to match) instead of leaving the modal state out of sync with the address bar.
+  window.addEventListener('popstate', ()=>{
+    const m = location.pathname.match(/^\/w\/([^/]+)$/);
+    if(m){ openProfile(decodeURIComponent(m[1]), {updateUrl:false}); }
+    else { $('#profile-overlay').classList.remove('open'); }
   });
   $('#confirm-cancel-btn').onclick = ()=> closeConfirmModal(null);
   $('#confirm-close-x').onclick = ()=> closeConfirmModal(null);
@@ -1496,5 +1575,11 @@ async function init(){
   await refreshSession();
   renderAll();
   activateTab(loadActiveTab());
+  // Deep link support: a QR code encodes .../w/<idWelder> -- if that's how this page was
+  // opened, jump straight to that welder's profile once data has loaded, on top of
+  // whichever tab was last open (usually Lookup, since that's where the public QR flow
+  // matters most).
+  const m = location.pathname.match(/^\/w\/([^/]+)$/);
+  if(m) openProfile(decodeURIComponent(m[1]), {updateUrl:false});
 }
 if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }

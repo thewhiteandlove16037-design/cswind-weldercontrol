@@ -2,13 +2,16 @@ const path = require('path');
 const fs = require('fs');
 const express = require('express');
 const cookieParser = require('cookie-parser');
+const cron = require('node-cron');
 const { pool, initSchema } = require('./db');
 const { readSession, JWT_SECRET, hashPassword } = require('./auth');
+const { sendReminderEmailNow, isMailerConfigured } = require('./mailer');
 
 const authRoutes = require('./routes/auth');
 const welderRoutes = require('./routes/welders');
 const accountRoutes = require('./routes/accounts');
 const settingsRoutes = require('./routes/settings');
+const reminderRoutes = require('./routes/reminders');
 
 const app = express();
 
@@ -24,9 +27,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/welders', welderRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/reminders', reminderRoutes);
 
 // Static frontend (plain HTML/CSS/JS, no build step) + SPA fallback so a deep link like
-// /welder/CS006 still serves index.html and lets the client-side router take over.
+// /w/CS006 (a specific welder's profile, used by that welder's QR code) still serves
+// index.html and lets the client-side router take over from the URL path.
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
@@ -121,6 +126,32 @@ async function autoImportSeedIfEmpty() {
   console.log(`Seed import done: ${ok}/${welders.length} welders imported${failed ? `, ${failed} failed` : ''}.`);
 }
 
+// In-process weekly reminder scheduler. This only fires while the process is actually
+// running -- on Render's Free plan the service sleeps after ~15 min idle, so this alone
+// won't reliably send on time; that's why routes/reminders.js also accepts a trigger from
+// an external scheduler (cron-job.org) via the X-Reminder-Secret header. Once/if the app
+// moves to an always-on paid plan, this in-process schedule becomes the reliable path with
+// zero extra setup -- so it's left on unconditionally rather than gated behind a flag.
+// Default: every Monday 08:00 Asia/Ho_Chi_Minh time. Override with REMINDER_CRON (5-field
+// cron expression) if a different day/time is wanted.
+function startWeeklyReminderSchedule() {
+  const expr = process.env.REMINDER_CRON || '0 8 * * 1';
+  cron.schedule(
+    expr,
+    async () => {
+      if (!isMailerConfigured()) return; // silently skip -- status endpoint reports this
+      try {
+        const result = await sendReminderEmailNow();
+        console.log(`Weekly reminder email sent to ${result.sentTo.join(', ')} (${result.count} expiring cert(s)).`);
+      } catch (e) {
+        console.error('Weekly reminder email failed:', e.message);
+      }
+    },
+    { timezone: 'Asia/Ho_Chi_Minh' }
+  );
+  console.log(`Weekly reminder schedule armed: "${expr}" (Asia/Ho_Chi_Minh). Only fires if the process is awake at that moment.`);
+}
+
 async function main() {
   if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'dev-only-insecure-secret-change-me') {
     // Fail loudly rather than silently issue session tokens signable by anyone who reads
@@ -131,6 +162,7 @@ async function main() {
   await initSchema();
   await seedDefaultAdminIfEmpty();
   await autoImportSeedIfEmpty();
+  startWeeklyReminderSchedule();
   app.listen(PORT, () => console.log(`CSWIND app listening on :${PORT}`));
 }
 

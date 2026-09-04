@@ -117,6 +117,63 @@ mở app trực tiếp ở URL Render (không qua SharePoint) để làm việc,
 cấu hình mặc định hiện tại (`SameSite=Lax`), đánh đổi lấy khả năng hoạt động tốt hơn trong
 iframe.
 
+## Bước 7 — Gửi email nhắc nhở tự động mỗi thứ 2 hàng tuần
+
+Ứng dụng có thể tự gửi email (danh sách thợ hàn sắp/đã hết hạn chứng chỉ) tới các địa chỉ
+trong Cài đặt (Settings > emails) — thật sự gửi qua máy chủ, không cần mở trình duyệt.
+
+### 7a — Lấy App Password cho hộp thư Outlook/Office 365
+
+1. Chọn một hộp thư sẽ dùng để gửi (ví dụ `noreply@cswind.com.vn` hoặc hộp thư của bạn).
+2. Đăng nhập https://account.microsoft.com/security → tìm mục **App passwords / Mật khẩu
+   ứng dụng** (nếu hộp thư có bật xác thực 2 lớp — thường là bắt buộc ở công ty).
+3. Tạo một App Password mới, đặt tên gợi nhớ (ví dụ "CSWIND Welder App"), copy lại chuỗi
+   mật khẩu hiện ra (chỉ hiện một lần).
+
+**Nếu không thấy mục "App passwords"**: có thể do bộ phận IT của CSWIND đã tắt tính năng
+xác thực SMTP cơ bản (Microsoft đang dần tắt tính năng này cho toàn bộ khách hàng doanh
+nghiệp) — trường hợp này cần nhờ IT cấp quyền qua Azure AD App Registration (phức tạp hơn,
+báo lại nếu gặp trường hợp này để tôi hướng dẫn tiếp theo hướng khác).
+
+### 7b — Thêm biến môi trường trên Render
+
+Vào Web Service `cswind-weldercontrol` → **Environment**, thêm:
+
+- `SMTP_USER` → hộp thư gửi, ví dụ `noreply@cswind.com.vn`
+- `SMTP_PASS` → App Password vừa tạo ở Bước 7a (không phải mật khẩu đăng nhập thường)
+- `MAIL_FROM` → (tuỳ chọn) địa chỉ hiển thị ở "Từ" — để trống thì dùng luôn `SMTP_USER`
+- `REMINDER_SECRET` → một chuỗi bí mật tự đặt (dùng cho Bước 7c) — ví dụ `cswind-remind-2026-xyz`
+
+Bấm **Save, rebuild, and deploy**.
+
+Sau khi deploy xong, đăng nhập app bằng tài khoản superadmin, vào tab Quản trị, tìm nút
+**"Gửi thử ngay (email thật)"** trong mục nhắc nhở — bấm thử để xác nhận email gửi thành
+công tới các địa chỉ trong Cài đặt.
+
+### 7c — Hẹn giờ tự động mỗi thứ 2 (dùng dịch vụ miễn phí bên ngoài)
+
+Vì gói Render miễn phí tự "ngủ", cần một dịch vụ bên ngoài "đánh thức" app đúng giờ hẹn:
+
+1. Vào https://cron-job.org, tạo tài khoản miễn phí (email + mật khẩu).
+2. Sau khi đăng nhập, bấm **Create cronjob**.
+3. Điền:
+   - **Title**: `CSWIND weekly reminder`
+   - **URL**: `https://cswind-weldercontrol.onrender.com/api/reminders/send`
+   - **Request method**: `POST`
+   - Kéo xuống mục **Advanced** (hoặc **Headers**) → thêm một header:
+     - Tên (Name): `X-Reminder-Secret`
+     - Giá trị (Value): đúng chuỗi bạn đặt ở `REMINDER_SECRET` Bước 7b
+   - **Schedule**: chọn chạy vào **Thứ 2 (Monday)**, giờ Việt Nam khoảng 8:00 sáng (cron-job.org
+     dùng UTC — 8:00 giờ VN = 01:00 UTC, tương ứng biểu thức `0 1 * * 1`)
+4. Bấm **Create** / **Save**.
+
+Từ đó, mỗi thứ 2 lúc 8h sáng, cron-job.org sẽ gọi vào app và app tự gửi email nhắc nhở —
+không cần mở trình duyệt, không cần Claude.
+
+**Muốn app luôn thức, hẹn giờ chạy chính xác hơn**: nâng cấp Web Service lên gói trả phí
+(~$7/tháng, xem "Ghi chú về gói Render" cuối tài liệu) — khi đó app tự hẹn giờ chính xác bên
+trong, bước 7c ở trên trở thành dự phòng chứ không bắt buộc.
+
 ## Việc cần làm sau khi deploy xong
 
 - [ ] Đổi mật khẩu tài khoản `admin` mặc định (hoặc tạo superadmin mới, xoá tài khoản mặc định)
@@ -127,7 +184,8 @@ iframe.
 - [ ] Test thử: đăng nhập bằng một tài khoản editor mới tạo, thử thêm/sửa một thợ hàn, xác
       nhận thay đổi lưu lại thật (tải lại trang để chắc chắn)
 - [ ] Test thử luồng khách hàng: quét mã QR (hoặc mở link tra cứu) mà không đăng nhập, xác
-      nhận xem được thông tin chứng chỉ
+      nhận xem được thông tin chứng chỉ — quét QR giờ sẽ mở thẳng trang riêng của thợ hàn đó
+- [ ] Cấu hình email nhắc nhở tự động (Bước 7), bấm "Gửi thử ngay" để xác nhận hoạt động
 
 ## Ghi chú về gói Render (Free vs trả phí)
 
