@@ -47,28 +47,33 @@ function entityLabel(code){
   const e = ENTITIES.find(x=>x.code===code);
   return e ? e.label : code;
 }
-function entityBarHtml(){
+function entityBarHtml(opts){
+  const allowDelete = !!(opts && opts.allowDelete);
   const buttons = ENTITIES.map(e=>
     `<button type="button" class="entity-btn ${e.code===activeEntity?'active':''}" data-entity="${esc(e.code)}">${esc(e.label)}</button>`
   ).join('');
   let extra = '';
   if(session && session.role==='superadmin'){
     extra += `<button type="button" class="entity-btn entity-btn-add" id="entity-add-btn" title="${esc(L.entityAddBtn)}">${esc(L.entityAddBtn)}</button>`;
-    // Guard against deleting an entity that still has welders in it (would orphan their
-    // records) or the last remaining entity -- disabled client-side with an explanatory
-    // title so a mistaken click never even reaches the server-side 409/400.
-    const inUse = weldersInActiveEntity().length > 0;
-    const onlyOne = ENTITIES.length <= 1;
-    const isDisabled = inUse || onlyOne;
-    const title = inUse ? L.entityDeleteDisabledInUse : (onlyOne ? L.entityDeleteDisabledLast : L.entityDeleteBtn);
-    extra += `<button type="button" class="entity-btn entity-btn-del" id="entity-del-btn" ${isDisabled?'disabled':''} title="${esc(title)}">${esc(L.entityDeleteBtn)}</button>`;
+    // Deleting is a destructive management action -- only rendered on the Admin tab's bar
+    // (allowDelete), never on the public-facing Lookup tab's bar, even for a superadmin.
+    if(allowDelete){
+      // Guard against deleting an entity that still has welders in it (would orphan their
+      // records) or the last remaining entity -- disabled client-side with an explanatory
+      // title so a mistaken click never even reaches the server-side 409/400.
+      const inUse = weldersInActiveEntity().length > 0;
+      const onlyOne = ENTITIES.length <= 1;
+      const isDisabled = inUse || onlyOne;
+      const title = inUse ? L.entityDeleteDisabledInUse : (onlyOne ? L.entityDeleteDisabledLast : L.entityDeleteBtn);
+      extra += `<button type="button" class="entity-btn entity-btn-del" id="entity-del-btn" ${isDisabled?'disabled':''} title="${esc(title)}">${esc(L.entityDeleteBtn)}</button>`;
+    }
   }
   return buttons + extra;
 }
-function wireEntityBar(containerId){
+function wireEntityBar(containerId, opts){
   const el = $('#'+containerId);
   if(!el) return;
-  el.innerHTML = entityBarHtml();
+  el.innerHTML = entityBarHtml(opts);
   el.querySelectorAll('.entity-btn[data-entity]').forEach(btn=>{
     btn.onclick = ()=>{
       if(btn.dataset.entity === activeEntity) return;
@@ -992,7 +997,7 @@ function renderAdmin(){
     </div>
   `;
   $('#btn-logout').onclick = logoutAdmin;
-  wireEntityBar('entity-bar-admin');
+  wireEntityBar('entity-bar-admin', { allowDelete: true });
   if(session.role==='superadmin'){
     loadAccountsAndRender();
     $('#btn-create-account').onclick = createAccount;

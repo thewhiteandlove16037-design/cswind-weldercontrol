@@ -196,8 +196,9 @@ Cách dùng:
   mới" cuối hàng nút (ở cả 2 tab). Bấm vào, nhập mã (vd `CSW-JP`, chỉ chữ/số/gạch ngang) rồi
   nhập tên hiển thị (vd `CSW Japan`) — entity mới xuất hiện ngay, không cần deploy lại.
   Tài khoản "editor" và "chỉ xem" không thấy nút này (không thể tự thêm entity).
-- **Xoá entity tạo nhầm**: cũng chỉ superadmin thấy nút "Xoá entity" cạnh nút "+" — bấm vào
-  entity muốn xoá để chọn nó, rồi bấm "Xoá entity". Để tránh mất dữ liệu thợ hàn thật, nút này
+- **Xoá entity tạo nhầm**: cũng chỉ superadmin thấy nút "Xoá entity", và nút này **chỉ xuất
+  hiện ở tab Quản trị** (không hiện ở tab Tra cứu, kể cả khi đang đăng nhập superadmin) — bấm
+  vào entity muốn xoá để chọn nó, rồi bấm "Xoá entity". Để tránh mất dữ liệu thợ hàn thật, nút này
   **tự động bị khoá (mờ đi)** nếu entity đang chọn còn thợ hàn nào bên trong, hoặc nếu đó là
   entity duy nhất còn lại — phải chuyển hết thợ hàn sang entity khác (sửa trong form thêm/sửa
   thợ hàn, đổi ô "Entity") hoặc xoá hết thợ hàn đó trước, thì nút xoá entity mới bấm được.
