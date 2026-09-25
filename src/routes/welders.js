@@ -1,6 +1,6 @@
 const express = require('express');
 const { pool } = require('../db');
-const { requireRole } = require('../auth');
+const { requireRole, canWriteEntity, forbidden } = require('../auth');
 
 const router = express.Router();
 
@@ -98,6 +98,10 @@ async function logAudit(client, accountName, action, welderId, detail) {
 router.post('/', requireRole('editor'), async (req, res) => {
   const { idWelder, name, idEmployee, company, photo, entity, certificates } = req.body || {};
   if (!idWelder || !name) return res.status(400).json({ error: 'missing_fields' });
+  // Entity-scoped accounts (Admin CSW VN, or an editor scoped to one entity) default to and
+  // may only write into their own entity.
+  const targetEntity = entity || req.user.entity || 'CSW-VN';
+  if (!canWriteEntity(req.user, targetEntity)) return forbidden(res);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -108,7 +112,7 @@ router.post('/', requireRole('editor'), async (req, res) => {
     }
     await client.query(
       'INSERT INTO welders (id_welder, name, id_employee, company, photo, entity) VALUES ($1,$2,$3,$4,$5,$6)',
-      [idWelder, name, idEmployee || null, company || null, photo || null, entity || 'CSW-VN']
+      [idWelder, name, idEmployee || null, company || null, photo || null, targetEntity]
     );
     await writeCertificates(client, idWelder, certificates);
     await logAudit(client, req.user.username, 'create', idWelder, name);
@@ -128,13 +132,20 @@ router.put('/:idWelder', requireRole('editor'), async (req, res) => {
   const idWelder = req.params.idWelder;
   const { name, idEmployee, company, photo, entity, certificates } = req.body || {};
   if (!name) return res.status(400).json({ error: 'missing_fields' });
+  const cur = await pool.query('SELECT entity FROM welders WHERE id_welder = $1', [idWelder]);
+  if (!cur.rowCount) return res.status(404).json({ error: 'not_found' });
+  const oldEntity = cur.rows[0].entity || 'CSW-VN';
+  const newEntity = entity || oldEntity;
+  // Must be allowed on both sides: can't edit another entity's welder, and can't move one
+  // of your own welders out into (or in from) an entity you don't manage.
+  if (!canWriteEntity(req.user, oldEntity) || !canWriteEntity(req.user, newEntity)) return forbidden(res);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const result = await client.query(
       `UPDATE welders SET name=$2, id_employee=$3, company=$4, photo=$5, entity=$6, last_modified=now()
        WHERE id_welder=$1`,
-      [idWelder, name, idEmployee || null, company || null, photo || null, entity || 'CSW-VN']
+      [idWelder, name, idEmployee || null, company || null, photo || null, newEntity]
     );
     if (!result.rowCount) {
       await client.query('ROLLBACK');
@@ -156,6 +167,9 @@ router.put('/:idWelder', requireRole('editor'), async (req, res) => {
 // Delete -- editor or superadmin (matches what the user asked for: editors may delete).
 router.delete('/:idWelder', requireRole('editor'), async (req, res) => {
   const idWelder = req.params.idWelder;
+  const cur = await pool.query('SELECT entity FROM welders WHERE id_welder = $1', [idWelder]);
+  if (!cur.rowCount) return res.status(404).json({ error: 'not_found' });
+  if (!canWriteEntity(req.user, cur.rows[0].entity || 'CSW-VN')) return forbidden(res);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');

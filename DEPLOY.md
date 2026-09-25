@@ -119,9 +119,22 @@ iframe.
 
 ## Bước 7 — Gửi email nhắc nhở tự động qua Gmail (thứ 2 & thứ 6, 8:00)
 
-Mỗi thứ 2 và thứ 6, khoảng 8:00 sáng (giờ Việt Nam), một email liệt kê các chứng chỉ **sắp /
-đã hết hạn** sẽ được gửi **từ Gmail cá nhân của bạn** tới các địa chỉ trong mục Cài đặt của app
-(tab Quản trị > Cài đặt > "Danh sách email nhận nhắc nhở").
+Mỗi thứ 2 và thứ 6, khoảng 8:00 sáng (giờ Việt Nam), **mỗi entity nhận một email riêng**
+(CSW-VN chỉ nhận danh sách thợ hàn CSW-VN, CSW-HQ chỉ nhận của CSW-HQ, ...) liệt kê các chứng chỉ
+**sắp / đã hết hạn**, gửi **từ Gmail cá nhân của Quản trị viên cấp cao**. Người nhận của mỗi
+entity do **Admin của entity đó** (hoặc Quản trị viên cấp cao) tự điền trong app: tab Quản trị →
+chọn entity → mục **"Cài đặt entity"** → "Danh sách email nhận nhắc nhở".
+
+- Entity **không có** chứng chỉ nào cần nhắc → không gửi.
+- Entity có chứng chỉ cần nhắc nhưng **chưa có email nhận** → không gửi, và được báo trong email
+  tổng hợp.
+- Sau mỗi lần chạy, Gmail của Quản trị viên cấp cao nhận **1 email tổng hợp**: entity nào đã gửi
+  tới ai, entity nào bị bỏ qua và vì sao.
+
+> **Nâng cấp từ update7/update8:** danh sách email nhận chung cũ tự động được chuyển sang
+> **CSW-VN**. Nếu bạn đã dán script ở bản trước, hãy **dán lại toàn bộ code
+> `GuiMailNhacNho.gs` mới** (bước 7b) rồi bấm Save — lịch gửi đã bật và mã bí mật giữ nguyên,
+> không cần làm lại 7c, 7f.
 
 **Vì sao không gửi thẳng từ app?** Từ 26/09/2025, Render gói Free **chặn mọi kết nối gửi mail
 (SMTP, cổng 25/465/587)**. Vì vậy việc gửi được giao cho **Google Apps Script** — một đoạn
@@ -173,19 +186,22 @@ Mã bí mật giúp chỉ script của bạn mới lấy được danh sách t�
    - Bấm **Allow** (Cho phép). Script xin 3 quyền: kết nối tới dịch vụ bên ngoài (để gọi app),
      gửi email thay bạn, và chạy theo lịch.
 4. Xem khung **Execution log** bên dưới. Thành công sẽ thấy:
-   `✓ Kết nối app thành công.` + danh sách người nhận + số chứng chỉ sắp/đã hết hạn.
-   - Nếu báo **"Người nhận: (chưa có…)"**: vào app → tab Quản trị → Cài đặt → điền email người
-     nhận (nhiều email cách nhau bằng dấu phẩy) → **Lưu cài đặt**, rồi chạy lại.
+   `✓ Kết nối app thành công. Nếu chạy gửi bây giờ:` + từng entity: **SẼ GỬI** bao nhiêu chứng
+   chỉ tới ai, hoặc **bỏ qua** vì sao.
+   - Entity báo **"⚠ … CHƯA có email nhận"**: vào app → tab Quản trị → chọn entity đó → mục
+     **Cài đặt entity** → điền email người nhận (cách nhau bằng dấu phẩy) → **Lưu cài đặt**.
+   - Nếu báo **410 / script đã cũ**: bạn đang dùng script bản cũ — dán lại code mới (7b).
    - Nếu báo **401 / từ chối mã bí mật**: mã ở 7c không khớp với Render ở 7a — sửa cho giống hệt.
-   - Nếu báo **404**: app chưa chạy bản `update7` — upload lại code và chờ Render deploy xong.
+   - Nếu báo **404**: app chưa chạy bản `update9` (hoặc mới hơn) — upload lại code và chờ Render deploy xong.
    - Nếu báo **"Lần thử 1 chưa được…"** rồi sau đó thành công: bình thường — app trên gói Free
      đang "ngủ", mất khoảng 1 phút để thức dậy.
 
 ### 7e — Gửi thử 1 email thật
 
-Chọn hàm **`guiMailNhacNho`** → **▷ Run**. Kiểm tra hộp thư của người nhận (và thư mục **Spam**
-lần đầu — nếu mail nằm trong Spam, bấm "Không phải thư rác"). Mở lại tab Quản trị của app:
-dòng trạng thái cuối mục nhắc nhở sẽ hiện **"Lần gửi gần nhất: …"**.
+Chọn hàm **`guiMailNhacNho`** → **▷ Run**. Kiểm tra hộp thư của người nhận từng entity (và thư
+mục **Spam** lần đầu — nếu mail nằm trong Spam, bấm "Không phải thư rác"), và email **tổng hợp**
+trong Gmail của bạn. Mở lại tab Quản trị của app, chọn entity: dòng trạng thái cuối mục nhắc nhở
+sẽ hiện **"Lần gửi gần nhất: …"** của entity đó.
 
 ### 7f — Bật lịch tự động thứ 2 & thứ 6 (chỉ làm 1 lần)
 
@@ -200,7 +216,8 @@ duyệt**. Google chạy lịch trong khoảng ±15 phút quanh 8:00, nên mail 
 
 ### Ghi chú
 
-- **Đổi người nhận**: chỉ cần sửa trong app (Quản trị > Cài đặt), không cần đụng vào script.
+- **Đổi người nhận**: chỉ cần sửa trong app (Quản trị → chọn entity → Cài đặt entity), không cần
+  đụng vào script. Muốn tắt email tổng hợp: sửa `GUI_TONG_HOP: true` thành `false` ở đầu script.
 - **Đổi giờ gửi**: sửa số `GIO_GUI: 8` ở đầu script → Save → chạy lại `caiDatLichGui`.
 - **Tắt tạm thời**: chạy hàm `huyLichGui`. Bật lại: chạy `caiDatLichGui`.
 - **Nếu gửi lỗi** (app không phản hồi, sai mã bí mật…), script tự gửi 1 email cảnh báo
@@ -253,9 +270,41 @@ Cách dùng:
   hai entity khác nhau không thể có cùng một mã thợ hàn (vd `CS006` chỉ tồn tại ở một entity).
 - **QR code / link riêng của từng thợ hàn không đổi** — vẫn theo mã thợ hàn
   (`.../<mã thợ hàn>`), không phân biệt entity trong đường link.
-- **Lưu ý về email nhắc nhở tự động (Bước 7)**: email nhắc nhở hiện vẫn gửi chung cho *tất
-  cả* các entity trong một email duy nhất (mỗi dòng có ghi rõ entity), chưa tách riêng theo từng entity. Nếu cần
-  tách email riêng theo entity (vd CSW-HQ tự nhận email riêng), báo lại Claude để bổ sung.
+- **Email nhắc nhở tự động (Bước 7)**: gửi riêng cho từng entity, tới danh sách email của
+  chính entity đó (xem Bước 7 và Bước 9).
+
+## Bước 9 — Quản trị viên entity (Admin CSW VN, Admin CSW HQ, ...)
+
+Ngoài 3 cấp quyền cũ (Quản trị cấp cao, Quản trị viên, Chỉ xem), app có thêm cấp **Quản trị viên
+entity** — mỗi tài khoản gắn với **một** entity, hiển thị là "Admin CSW VN", "Admin CSW HQ", ...
+
+**Tạo / xoá (chỉ Quản trị viên cấp cao):** tab Quản trị → mục "Quản lý tài khoản quản trị" →
+"Cấp tài khoản quản trị mới" → chọn Cấp quyền **Quản trị viên entity** → chọn **Entity** → Tạo tài
+khoản. Trong danh sách tài khoản có thể đổi cấp quyền / đổi entity / đặt lại mật khẩu / xoá.
+
+**Admin entity ĐƯỢC làm (chỉ trong entity của mình):**
+- Thêm / sửa / xoá thợ hàn, nhập Excel.
+- Sửa **Cài đặt entity**: số ngày cảnh báo sắp hết hạn + danh sách email nhận nhắc nhở.
+- Tạo / xoá / đặt lại mật khẩu tài khoản **Quản trị viên** và **Chỉ xem** thuộc entity của mình.
+- Soạn email nhắc nhở cho entity của mình.
+- **Xem** dữ liệu các entity khác (chỉ xem — có dòng thông báo màu vàng, không có nút sửa/xoá).
+
+**Admin entity KHÔNG được làm:**
+- Sửa / xoá bất cứ thông tin nào của entity khác (thợ hàn, cài đặt, tài khoản).
+- Sửa **Base URL** (cài đặt chung — chỉ Quản trị viên cấp cao).
+- Thêm / xoá entity, tạo Quản trị viên cấp cao hoặc Admin entity khác.
+- Chuyển thợ hàn sang entity khác.
+
+**Quản trị viên / Chỉ xem gắn với entity:** khi Quản trị viên cấp cao tạo tài khoản
+"Quản trị viên" hoặc "Chỉ xem", ô **Entity** có thể để **"Tất cả entity"** (như trước đây) hoặc
+chọn một entity — khi đó "Quản trị viên (CSW VN)" chỉ sửa được dữ liệu CSW-VN.
+
+**Số ngày cảnh báo theo từng entity:** mỗi entity có số ngày cảnh báo riêng (mặc định 45 như
+trước). Trạng thái "Sắp hết hạn" ở trang Tra cứu, trang riêng thợ hàn, thống kê và email đều tính
+theo số ngày của entity chứa thợ hàn đó.
+
+**Xoá entity:** ngoài điều kiện cũ (không còn thợ hàn), giờ còn phải **không còn tài khoản nào
+gắn với entity đó** (xoá hoặc đổi entity của các tài khoản đó trước).
 
 ## Việc cần làm sau khi deploy xong
 
@@ -269,6 +318,7 @@ Cách dùng:
 - [ ] Test thử luồng khách hàng: quét mã QR (hoặc mở link tra cứu) mà không đăng nhập, xác
       nhận xem được thông tin chứng chỉ — quét QR giờ sẽ mở thẳng trang riêng của thợ hàn đó
 - [ ] Cấu hình email nhắc nhở tự động qua Gmail (Bước 7), chạy `guiMailNhacNho` để gửi thử
+- [ ] Tạo tài khoản Admin cho từng entity (Bước 9) và nhờ họ điền email nhận nhắc nhở trong "Cài đặt entity"
 - [ ] Nếu công ty có nhiều chi nhánh (CSW-HQ, CSW-TR...), thử bấm qua lại các nút entity ở tab
       Tra cứu/Quản trị (Bước 8) để quen với cách chuyển đổi
 

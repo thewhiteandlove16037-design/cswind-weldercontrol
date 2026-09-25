@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const {
   sendReminderEmailNow, isMailerConfigured, isAppsScriptConfigured,
-  composeReminder, recordReminderSent, getLastReminder,
+  composeEntityReminders, recordReminderSent, getLastReminder,
 } = require('../mailer');
 
 const router = express.Router();
@@ -37,29 +37,44 @@ router.get('/status', async (req, res) => {
   });
 });
 
-// Gmail / Apps Script path, step 1: hand over the ready-to-send email. Does not send
-// anything and does not change any data.
-router.get('/payload', authorizeReminderTrigger, async (req, res) => {
+// Old (update7) single-email endpoint. Replaced by /payload-v2 (one email per entity) --
+// answer clearly so an old copy of the Apps Script fails with an explanation instead of
+// silently sending one combined email to the old global list.
+router.get('/payload', authorizeReminderTrigger, (req, res) => {
+  res.status(410).json({
+    error: 'script_outdated',
+    message: 'Script Google Apps Script đã cũ — hãy thay bằng bản GuiMailNhacNho.gs mới (update9: gửi riêng từng entity).',
+  });
+});
+
+// Gmail / Apps Script path, step 1: hand over the ready-to-send emails, one per entity
+// that has something due AND has recipients. Sends nothing, changes nothing.
+router.get('/payload-v2', authorizeReminderTrigger, async (req, res) => {
   try {
-    const mail = await composeReminder();
-    res.json({ ok: true, ...mail });
+    const plan = await composeEntityReminders();
+    res.json({ ok: true, ...plan });
   } catch (e) {
     console.error('Reminder payload failed:', e.message);
     res.status(500).json({ error: 'payload_failed', message: e.message });
   }
 });
 
-// Gmail / Apps Script path, step 2: the script reports it has sent the email.
+// Gmail / Apps Script path, step 2: the script reports what it actually sent.
+// Body: {results: [{entity, count, sentTo: [...]}, ...]}
 router.post('/ack', authorizeReminderTrigger, async (req, res) => {
-  const { count, sentTo } = req.body || {};
+  const results = Array.isArray((req.body || {}).results) ? req.body.results : [];
   try {
-    await recordReminderSent({
-      count: parseInt(count, 10),
-      to: Array.isArray(sentTo) ? sentTo.map(String) : [],
-      via: 'gmail',
-    });
-    console.log(`Reminder email sent via Gmail/Apps Script to ${(sentTo || []).join(', ')} (${count} cert(s)).`);
-    res.json({ ok: true });
+    for (const r of results) {
+      if (!r || !r.entity) continue;
+      await recordReminderSent({
+        entity: String(r.entity),
+        count: parseInt(r.count, 10),
+        to: Array.isArray(r.sentTo) ? r.sentTo.map(String) : [],
+        via: 'gmail',
+      });
+    }
+    console.log(`Reminder emails sent via Gmail/Apps Script: ${results.map((r) => r.entity + ':' + r.count).join(', ') || 'none'}.`);
+    res.json({ ok: true, recorded: results.length });
   } catch (e) {
     console.error('Reminder ack failed:', e.message);
     res.status(500).json({ error: 'ack_failed' });

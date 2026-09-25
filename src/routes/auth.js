@@ -10,7 +10,7 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'missing_fields' });
   }
   const { rows } = await pool.query(
-    'SELECT id, username, password_hash, role FROM accounts WHERE lower(username) = lower($1)',
+    'SELECT id, username, password_hash, role, entity FROM accounts WHERE lower(username) = lower($1)',
     [username]
   );
   const acc = rows[0];
@@ -22,7 +22,7 @@ router.post('/login', async (req, res) => {
   const ok = await verifyPassword(password, acc.password_hash);
   if (!ok) return res.status(401).json({ error: 'invalid_credentials' });
   setSessionCookie(res, acc);
-  res.json({ name: acc.username, role: acc.role });
+  res.json({ name: acc.username, role: acc.role, entity: acc.entity || null });
 });
 
 router.post('/logout', (req, res) => {
@@ -32,7 +32,7 @@ router.post('/logout', (req, res) => {
 
 router.get('/me', (req, res) => {
   if (!req.user) return res.status(401).json({ error: 'not_authenticated' });
-  res.json({ name: req.user.username, role: req.user.role });
+  res.json({ name: req.user.username, role: req.user.role, entity: req.user.entity || null });
 });
 
 module.exports = router;

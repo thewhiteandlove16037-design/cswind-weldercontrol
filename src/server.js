@@ -4,7 +4,7 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const cron = require('node-cron');
 const { pool, initSchema } = require('./db');
-const { readSession, JWT_SECRET, hashPassword } = require('./auth');
+const { readSession, makeRefreshUser, JWT_SECRET, hashPassword } = require('./auth');
 const { sendReminderEmailNow, isMailerConfigured } = require('./mailer');
 
 const authRoutes = require('./routes/auth');
@@ -23,6 +23,7 @@ app.set('trust proxy', 1);
 app.use(express.json({ limit: '15mb' })); // certificate scan images ride along as base64
 app.use(cookieParser());
 app.use(readSession);
+app.use('/api', makeRefreshUser(pool)); // fresh role/entity from DB on every API call
 
 app.use('/api/auth', authRoutes);
 app.use('/api/welders', welderRoutes);
@@ -141,7 +142,7 @@ function startWeeklyReminderSchedule() {
       if (!isMailerConfigured()) return; // silently skip -- status endpoint reports this
       try {
         const result = await sendReminderEmailNow();
-        console.log(`Weekly reminder email sent to ${result.sentTo.join(', ')} (${result.count} expiring cert(s)).`);
+        console.log(`Reminder emails sent (SMTP): ${result.sent.map((x) => x.entity + ':' + x.count).join(', ') || 'none'}; failed: ${result.failed.length}.`);
       } catch (e) {
         console.error('Weekly reminder email failed:', e.message);
       }
