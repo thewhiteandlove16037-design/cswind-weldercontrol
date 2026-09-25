@@ -246,6 +246,27 @@ const L_VI = {
   masterSearchPlaceholder: 'Tìm theo mã hoặc tên…',
   filterProcessAll: 'Tất cả quy trình',
   addWelderBtn: '+ Thêm thợ hàn', importExcelBtn: '⭱ Nhập từ Excel',
+  photoToolBtn: '🖼 Lấy ảnh từ chứng chỉ gốc',
+  photoToolTitle: 'Lấy ảnh đại diện từ chứng chỉ gốc',
+  photoToolIntro: (label, n)=>`${n} thợ hàn của ${label} có ảnh chứng chỉ gốc. App tự tìm khuôn mặt trên chứng chỉ và cắt thành ảnh đại diện. Kiểm tra từng ảnh, bỏ chọn ảnh chưa đúng (hoặc bấm "Chỉnh tay"), rồi bấm Lưu.`,
+  photoToolNone: label=>`Chưa có thợ hàn nào của ${label} có ảnh chứng chỉ gốc.`,
+  photoToolLoading: 'Đang tải bộ nhận diện khuôn mặt… (lần đầu có thể mất vài giây)',
+  photoToolProgress: (i, n)=>`Đang phân tích ${i}/${n}…`,
+  photoToolDone: (found, n)=>`Xong: tìm thấy khuôn mặt ở ${found}/${n} thợ hàn.`,
+  photoToolLoadFail: 'Không tải được bộ nhận diện khuôn mặt — vẫn có thể bấm "Chỉnh tay" để cắt ảnh từng người.',
+  photoToolWaiting: 'Đang chờ…',
+  photoToolFound: 'Đã tìm thấy khuôn mặt',
+  photoToolNotFound: 'Không tìm thấy khuôn mặt — bấm "Chỉnh tay"',
+  photoToolManualSet: 'Đã chỉnh tay',
+  photoToolManual: 'Chỉnh tay',
+  photoToolCurrent: 'Ảnh hiện tại', photoToolNew: 'Ảnh mới', photoToolNoCurrent: 'Chưa có',
+  photoToolSelectAll: 'Chọn tất cả', photoToolSelectNone: 'Bỏ chọn tất cả',
+  photoToolSave: n=>`Lưu ${n} ảnh đã chọn`,
+  photoToolSaving: (i, n)=>`Đang lưu ${i}/${n}…`,
+  photoToolSaved: n=>`Đã cập nhật ảnh đại diện cho ${n} thợ hàn.`,
+  photoToolManualHint: 'Kéo chuột (hoặc ngón tay) trên ảnh chứng chỉ để khoanh vùng ảnh thợ hàn, rồi bấm "Dùng vùng này".',
+  photoToolUseArea: 'Dùng vùng này', photoToolBack: '← Quay lại danh sách',
+  photoToolCertPick: 'Ảnh chứng chỉ',
   exportTemplateBtn: '⭳ Xuất file mẫu Excel',
   colCode: 'Mã', colName: 'Họ tên', colEmployeeId: 'Mã NV', colCertCount: 'Số CC', colStatusShort: 'Trạng thái',
   viewBtn: 'Xem', editBtn: 'Sửa', qrBtn: 'QR', deleteBtn: 'Xoá',
@@ -381,6 +402,27 @@ const L_EN = {
   masterSearchPlaceholder: 'Search by ID or name…',
   filterProcessAll: 'All processes',
   addWelderBtn: '+ Add welder', importExcelBtn: '⭱ Import from Excel',
+  photoToolBtn: '🖼 Photos from original certificates',
+  photoToolTitle: 'Profile photos from original certificates',
+  photoToolIntro: (label, n)=>`${n} ${label} welder(s) have an original certificate image. The app finds the face on each certificate and crops it into a profile photo. Check each one, untick any that look wrong (or use "Adjust"), then Save.`,
+  photoToolNone: label=>`No ${label} welder has an original certificate image yet.`,
+  photoToolLoading: 'Loading the face detector… (may take a few seconds the first time)',
+  photoToolProgress: (i, n)=>`Analysing ${i}/${n}…`,
+  photoToolDone: (found, n)=>`Done: face found for ${found}/${n} welder(s).`,
+  photoToolLoadFail: 'Could not load the face detector — you can still use "Adjust" to crop each photo by hand.',
+  photoToolWaiting: 'Waiting…',
+  photoToolFound: 'Face found',
+  photoToolNotFound: 'No face found — use "Adjust"',
+  photoToolManualSet: 'Adjusted by hand',
+  photoToolManual: 'Adjust',
+  photoToolCurrent: 'Current', photoToolNew: 'New', photoToolNoCurrent: 'None',
+  photoToolSelectAll: 'Select all', photoToolSelectNone: 'Select none',
+  photoToolSave: n=>`Save ${n} selected photo(s)`,
+  photoToolSaving: (i, n)=>`Saving ${i}/${n}…`,
+  photoToolSaved: n=>`Profile photo updated for ${n} welder(s).`,
+  photoToolManualHint: 'Drag on the certificate (mouse or finger) to box the welder\'s photo, then press "Use this area".',
+  photoToolUseArea: 'Use this area', photoToolBack: '← Back to list',
+  photoToolCertPick: 'Certificate image',
   exportTemplateBtn: '⭳ Export Excel template',
   colCode: 'ID', colName: 'Name', colEmployeeId: 'Employee ID', colCertCount: '# Certs', colStatusShort: 'Status',
   viewBtn: 'View', editBtn: 'Edit', qrBtn: 'QR', deleteBtn: 'Delete',
@@ -1140,6 +1182,7 @@ function renderAdmin(){
         ${canEditWelderData() ? `<button class="btn btn-primary write-action" id="btn-add-welder">${L.addWelderBtn}</button>` : ''}
         ${canEditWelderData() ? `
         <button class="btn write-action" id="btn-import-excel">${L.importExcelBtn}</button>
+        <button class="btn write-action" id="btn-photo-from-cert">${L.photoToolBtn}</button>
         <button class="btn" id="btn-export-template">${L.exportTemplateBtn}</button>` : ''}
       </div>
       <div class="row" style="justify-content:space-between;margin-bottom:8px">
@@ -1180,6 +1223,7 @@ function renderAdmin(){
   $('#admin-filter-process').onchange = renderAdminTable;
   if($('#btn-add-welder')) $('#btn-add-welder').onclick = ()=>openWelderForm(null);
   if($('#btn-import-excel')) $('#btn-import-excel').onclick = openImportModal;
+  if($('#btn-photo-from-cert')) $('#btn-photo-from-cert').onclick = openPhotoTool;
   if($('#btn-export-template')) $('#btn-export-template').onclick = exportImportTemplate;
   if($('#btn-delete-selected')) $('#btn-delete-selected').onclick = ()=>{
     const ids = Array.from(adminSelectedIds);
@@ -1812,6 +1856,255 @@ async function saveWelderForm(){
    Runs in a real, unsandboxed browser now -- template export and any future full-export
    use a plain Blob + temporary <a download> link instead of the old artifact "downloads"
    capability workaround. */
+/* ================= PROFILE PHOTOS FROM ORIGINAL CERTIFICATES (update15) =================
+   Runs entirely in the admin's browser: the certificate scans are already loaded with the
+   welder data, a small face detector (face-api.js tiny model, served from /vendor -- no CDN)
+   finds the face, and a square around it becomes the avatar. Nothing is saved until the
+   admin reviews the grid and presses Save (PUT /api/welders/:id/photo, entity-checked). */
+let FACEAPI_PROMISE = null;
+function loadFaceApi(){
+  if(FACEAPI_PROMISE) return FACEAPI_PROMISE;
+  FACEAPI_PROMISE = new Promise((resolve, reject)=>{
+    const done = async ()=>{
+      try{ await faceapi.nets.tinyFaceDetector.loadFromUri('/vendor/face-api/models'); resolve(); }
+      catch(e){ reject(e); }
+    };
+    if(typeof faceapi !== 'undefined') return done();
+    const sc = document.createElement('script');
+    sc.src = '/vendor/face-api/face-api.js';
+    sc.onload = done;
+    sc.onerror = ()=> reject(new Error('face-api load failed'));
+    document.head.appendChild(sc);
+  });
+  FACEAPI_PROMISE.catch(()=>{ FACEAPI_PROMISE = null; });
+  return FACEAPI_PROMISE;
+}
+function loadImageEl(src){
+  return new Promise((resolve, reject)=>{
+    const im = new Image();
+    im.onload = ()=> resolve(im);
+    im.onerror = reject;
+    im.src = src;
+  });
+}
+// Newest certificate first (latest expiry date) -- its scan most likely has the current photo.
+function certImagesFor(w){
+  return (w.certificates||[])
+    .filter(c=>c.originalCertImage && /^data:image\//.test(c.originalCertImage))
+    .sort((a,b)=> String(b.validDate||'').localeCompare(String(a.validDate||'')))
+    .map(c=>({src:c.originalCertImage, label:[c.process, c.type].filter(Boolean).join(' · ') + (c.validDate ? ' — '+fmtDate(c.validDate) : '')}));
+}
+async function detectFaceBox(img){
+  for(const size of [416, 608, 832]){
+    const found = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions({inputSize:size, scoreThreshold:0.4}));
+    if(found.length){
+      found.sort((a,b)=> b.box.area*b.score - a.box.area*a.score);
+      return found[0].box;
+    }
+  }
+  return null;
+}
+// Square around the face with room for hair/shoulders, kept inside the image.
+function squareAroundFace(img, box){
+  const W = img.naturalWidth, H = img.naturalHeight;
+  const side = Math.min(Math.max(box.width, box.height) * 2.0, W, H);
+  const cx = box.x + box.width/2, cy = box.y + box.height/2 - box.height*0.08;
+  return {
+    x: Math.max(0, Math.min(W - side, cx - side/2)),
+    y: Math.max(0, Math.min(H - side, cy - side/2)),
+    side,
+  };
+}
+function cropToDataUrl(img, r){
+  const OUT = 320;
+  const c = document.createElement('canvas');
+  c.width = c.height = OUT;
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, OUT, OUT);
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(img, r.x, r.y, r.side, r.side, 0, 0, OUT, OUT);
+  return c.toDataURL('image/jpeg', 0.85);
+}
+
+let PT = null; // {items:[{w, certs, certIdx, crop, checked, status}], running}
+function openPhotoTool(){
+  if(PT) PT.cancelled = true; // stop a previous run still analysing in the background
+  const list = weldersInActiveEntity().filter(w=> canWriteEntity(w.entity||'CSW-VN') && certImagesFor(w).length);
+  $('#photo-tool-close-x').onclick = closePhotoTool;
+  PT = { items: list.map(w=>({ w, certs: certImagesFor(w), certIdx: 0, crop: null, checked: false, status: 'wait' })), running: false, cancelled: false };
+  $('#photo-tool-title').textContent = L.photoToolTitle;
+  $('#photo-tool-overlay').classList.add('open');
+  if(!PT.items.length){
+    $('#photo-tool-body').innerHTML = `<div class="muted" style="padding:10px 0">${esc(L.photoToolNone(entityLabel(activeEntity)))}</div>`;
+    return;
+  }
+  renderPhotoToolList();
+  runPhotoDetection();
+}
+function closePhotoTool(){
+  if(PT) PT.cancelled = true;
+  $('#photo-tool-overlay').classList.remove('open');
+}
+function ptStatusText(it){
+  return {wait:L.photoToolWaiting, found:L.photoToolFound, notfound:L.photoToolNotFound, manual:L.photoToolManualSet}[it.status] || '';
+}
+function renderPhotoToolList(){
+  const items = PT.items;
+  const nChecked = items.filter(it=>it.checked && it.crop).length;
+  const avatarHtml = (w)=> w.photo
+    ? `<img class="pt-img" src="${w.photo}" alt="">`
+    : `<div class="pt-img pt-empty">${esc(L.photoToolNoCurrent)}</div>`;
+  $('#photo-tool-body').innerHTML = `
+    <div class="small muted" style="margin-bottom:8px">${esc(L.photoToolIntro(entityLabel(activeEntity), items.length))}</div>
+    <div class="small" id="pt-progress" style="margin-bottom:8px;font-weight:600"></div>
+    <div class="row" style="gap:8px;margin-bottom:10px">
+      <button class="btn btn-sm" id="pt-all">${L.photoToolSelectAll}</button>
+      <button class="btn btn-sm" id="pt-none">${L.photoToolSelectNone}</button>
+    </div>
+    <div class="pt-grid">
+      ${items.map((it,i)=>`
+        <div class="pt-card ${it.checked&&it.crop?'pt-on':''}" data-pt-card="${i}">
+          <label class="pt-head"><input type="checkbox" data-pt-check="${i}" ${it.checked?'checked':''} ${it.crop?'':'disabled'}>
+            <span><b>${esc(it.w.idWelder)}</b><br><span class="small">${esc(it.w.name)}</span></span></label>
+          <div class="pt-imgs">
+            <div class="pt-col">${avatarHtml(it.w)}<div class="small muted">${L.photoToolCurrent}</div></div>
+            <div class="pt-arrow">→</div>
+            <div class="pt-col">${it.crop ? `<img class="pt-img pt-new" src="${it.crop}" alt="">` : `<div class="pt-img pt-empty">…</div>`}<div class="small muted">${L.photoToolNew}</div></div>
+          </div>
+          <div class="small pt-status pt-st-${it.status}">${esc(ptStatusText(it))}</div>
+          <button class="btn btn-sm" data-pt-manual="${i}">${L.photoToolManual}</button>
+        </div>`).join('')}
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="pt-close">${L.cancelBtn}</button>
+      <button class="btn btn-primary" id="pt-save" ${nChecked?'':'disabled'}>${esc(L.photoToolSave(nChecked))}</button>
+    </div>`;
+  $all('[data-pt-check]').forEach(cb=>{
+    cb.onchange = ()=>{ PT.items[+cb.dataset.ptCheck].checked = cb.checked; renderPhotoToolList(); };
+  });
+  $all('[data-pt-manual]').forEach(b=>{ b.onclick = ()=> openPhotoManual(+b.dataset.ptManual); });
+  $('#pt-all').onclick = ()=>{ PT.items.forEach(it=>{ if(it.crop) it.checked = true; }); renderPhotoToolList(); };
+  $('#pt-none').onclick = ()=>{ PT.items.forEach(it=>{ it.checked = false; }); renderPhotoToolList(); };
+  $('#pt-close').onclick = closePhotoTool;
+  $('#pt-save').onclick = savePhotoTool;
+  updatePhotoProgress();
+}
+function updatePhotoProgress(msg){
+  if(msg !== undefined && PT) PT.progress = msg;
+  const el = $('#pt-progress');
+  if(el && PT) el.textContent = PT.progress || '';
+}
+async function runPhotoDetection(){
+  if(!PT || PT.running) return;
+  PT.running = true;
+  const run = PT;
+  updatePhotoProgress(L.photoToolLoading);
+  try{ await loadFaceApi(); }
+  catch(e){
+    run.items.forEach(it=>{ if(it.status==='wait') it.status = 'notfound'; });
+    run.running = false;
+    if(PT===run){ updatePhotoProgress(L.photoToolLoadFail); renderPhotoToolList(); }
+    return;
+  }
+  let found = 0;
+  for(let i=0; i<run.items.length; i++){
+    if(run.cancelled) return;
+    const it = run.items[i];
+    if(it.status !== 'wait') { if(it.crop) found++; continue; }
+    updatePhotoProgress(L.photoToolProgress(i+1, run.items.length));
+    for(let k=0; k<it.certs.length && !it.crop; k++){
+      try{
+        const img = await loadImageEl(it.certs[k].src);
+        const box = await detectFaceBox(img);
+        if(box){ it.crop = cropToDataUrl(img, squareAroundFace(img, box)); it.certIdx = k; }
+      }catch(e){ /* unreadable image -- try the next certificate */ }
+    }
+    if(it.status === 'wait'){ it.status = it.crop ? 'found' : 'notfound'; it.checked = !!it.crop; }
+    if(it.crop) found++;
+    if(PT===run && !$('#pt-manual-view')) renderPhotoToolList();
+  }
+  run.running = false;
+  if(PT===run){ updatePhotoProgress(L.photoToolDone(found, run.items.length)); if(!$('#pt-manual-view')) renderPhotoToolList(); }
+}
+function openPhotoManual(i){
+  const it = PT.items[i];
+  const body = $('#photo-tool-body');
+  body.innerHTML = `
+    <div id="pt-manual-view">
+      <div class="row" style="justify-content:space-between;margin-bottom:8px">
+        <div><b>${esc(it.w.idWelder)}</b> · ${esc(it.w.name)}</div>
+        ${it.certs.length > 1 ? `<label class="small muted">${L.photoToolCertPick}
+          <select id="pt-cert-pick" style="width:auto">${it.certs.map((c,k)=>`<option value="${k}" ${k===it.certIdx?'selected':''}>${esc(c.label||('#'+(k+1)))}</option>`).join('')}</select></label>` : ''}
+      </div>
+      <div class="small muted" style="margin-bottom:8px">${L.photoToolManualHint}</div>
+      <div class="pt-stage" id="pt-stage"><img id="pt-cert-img" src="${it.certs[it.certIdx].src}" alt="" draggable="false"><div class="pt-sel" id="pt-sel"></div></div>
+      <div class="row" style="gap:10px;margin-top:10px;align-items:center">
+        <img class="pt-img pt-new" id="pt-manual-preview" src="${it.crop||''}" style="${it.crop?'':'visibility:hidden'}" alt="">
+        <span class="small muted" id="pt-manual-note"></span>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" id="pt-back">${L.photoToolBack}</button>
+        <button class="btn btn-primary" id="pt-use" disabled>${L.photoToolUseArea}</button>
+      </div>
+    </div>`;
+  const imgEl = $('#pt-cert-img'), sel = $('#pt-sel'), stage = $('#pt-stage');
+  let start = null, rect = null; // rect in natural image px {x,y,side}
+  const toImg = (ev)=>{
+    const b = imgEl.getBoundingClientRect();
+    const sx = imgEl.naturalWidth / b.width;
+    return { x: Math.max(0, Math.min(b.width, ev.clientX - b.left)) * sx, y: Math.max(0, Math.min(b.height, ev.clientY - b.top)) * sx, s: sx };
+  };
+  const draw = ()=>{
+    if(!rect){ sel.style.display = 'none'; return; }
+    const b = imgEl.getBoundingClientRect(), s = b.width / imgEl.naturalWidth;
+    Object.assign(sel.style, { display:'block', left:(rect.x*s)+'px', top:(rect.y*s)+'px', width:(rect.side*s)+'px', height:(rect.side*s)+'px' });
+    $('#pt-manual-preview').src = cropToDataUrl(imgEl, rect);
+    $('#pt-manual-preview').style.visibility = 'visible';
+    $('#pt-use').disabled = rect.side < 8;
+  };
+  stage.onpointerdown = (ev)=>{ ev.preventDefault(); stage.setPointerCapture(ev.pointerId); start = toImg(ev); rect = null; draw(); };
+  stage.onpointermove = (ev)=>{
+    if(!start) return;
+    const p = toImg(ev);
+    const side = Math.max(Math.abs(p.x - start.x), Math.abs(p.y - start.y));
+    const W = imgEl.naturalWidth, H = imgEl.naturalHeight;
+    let x = p.x < start.x ? start.x - side : start.x;
+    let y = p.y < start.y ? start.y - side : start.y;
+    const sd = Math.min(side, W, H);
+    x = Math.max(0, Math.min(W - sd, x)); y = Math.max(0, Math.min(H - sd, y));
+    rect = { x, y, side: sd };
+    draw();
+  };
+  stage.onpointerup = ()=>{ start = null; };
+  if($('#pt-cert-pick')) $('#pt-cert-pick').onchange = ()=>{ it.certIdx = +$('#pt-cert-pick').value; imgEl.src = it.certs[it.certIdx].src; rect = null; draw(); };
+  $('#pt-back').onclick = ()=> renderPhotoToolList();
+  $('#pt-use').onclick = ()=>{
+    if(!rect) return;
+    it.crop = cropToDataUrl(imgEl, rect);
+    it.status = 'manual'; it.checked = true;
+    renderPhotoToolList();
+  };
+}
+async function savePhotoTool(){
+  const todo = PT.items.filter(it=>it.checked && it.crop);
+  if(!todo.length) return;
+  const btn = $('#pt-save'); if(btn) btn.disabled = true;
+  let ok = 0;
+  for(let i=0; i<todo.length; i++){
+    updatePhotoProgress(L.photoToolSaving(i+1, todo.length));
+    try{
+      await apiFetch('PUT', '/api/welders/'+encodeURIComponent(todo[i].w.idWelder)+'/photo', { photo: todo[i].crop });
+      ok++;
+    }catch(e){
+      if(handleWriteError(e)){ break; }
+    }
+  }
+  closePhotoTool();
+  await loadWelders();
+  toast(L.photoToolSaved(ok));
+  renderAll();
+}
+
 function openImportModal(){
   $('#import-title').textContent = L.importTitle;
   $('#import-body').innerHTML = `

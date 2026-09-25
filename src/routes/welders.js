@@ -164,6 +164,34 @@ router.put('/:idWelder', requireRole('editor'), async (req, res) => {
   }
 });
 
+// Update ONLY the welder's photo (update15: "Lấy ảnh từ chứng chỉ gốc" tool) -- avoids
+// re-sending every certificate (and its scanned image) just to change the avatar.
+router.put('/:idWelder/photo', requireRole('editor'), async (req, res) => {
+  const idWelder = req.params.idWelder;
+  const photo = (req.body || {}).photo;
+  if (typeof photo !== 'string' || !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(photo)) {
+    return res.status(400).json({ error: 'invalid_photo' });
+  }
+  if (photo.length > 600000) return res.status(413).json({ error: 'photo_too_large' });
+  const cur = await pool.query('SELECT entity FROM welders WHERE id_welder = $1', [idWelder]);
+  if (!cur.rowCount) return res.status(404).json({ error: 'not_found' });
+  if (!canWriteEntity(req.user, cur.rows[0].entity || 'CSW-VN')) return forbidden(res);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('UPDATE welders SET photo = $2, last_modified = now() WHERE id_welder = $1', [idWelder, photo]);
+    await logAudit(client, req.user.username, 'photo', idWelder, 'avatar from original certificate');
+    await client.query('COMMIT');
+    res.json({ ok: true });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    console.error(e);
+    res.status(500).json({ error: 'server_error' });
+  } finally {
+    client.release();
+  }
+});
+
 // Delete -- editor or superadmin (matches what the user asked for: editors may delete).
 router.delete('/:idWelder', requireRole('editor'), async (req, res) => {
   const idWelder = req.params.idWelder;

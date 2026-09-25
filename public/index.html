@@ -127,6 +127,21 @@ input[type=file]{font-size:13px}
 .cert-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .cert-edit-grid .field{margin-bottom:6px}
 .modal-lg{max-width:760px}
+/* update15: "photos from original certificates" tool */
+.pt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;max-height:60vh;overflow-y:auto;padding:2px}
+.pt-card{border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;background:var(--card)}
+.pt-card.pt-on{border-color:var(--brand2);box-shadow:0 0 0 1px var(--brand2) inset}
+.pt-head{display:flex;gap:8px;align-items:flex-start;cursor:pointer;line-height:1.3}
+.pt-imgs{display:flex;align-items:center;justify-content:space-around;gap:6px}
+.pt-col{display:flex;flex-direction:column;align-items:center;gap:3px}
+.pt-arrow{color:var(--muted);font-weight:700}
+.pt-img{width:74px;height:74px;border-radius:50%;object-fit:cover;border:1px solid var(--line);flex:none}
+.pt-img.pt-new{border:2px solid var(--brand2)}
+.pt-empty{display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);background:var(--chip-bg)}
+.pt-status.pt-st-found{color:var(--ok)} .pt-status.pt-st-notfound{color:var(--bad)} .pt-status.pt-st-manual{color:var(--brand2)}
+.pt-stage{position:relative;display:inline-block;max-width:100%;touch-action:none;user-select:none;cursor:crosshair;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.pt-stage img{display:block;max-width:100%;max-height:60vh;width:auto;height:auto}
+.pt-sel{position:absolute;display:none;border:2px solid #22c55e;box-shadow:0 0 0 9999px rgba(0,0,0,.35);pointer-events:none}
 .modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;border-top:1px solid var(--line);padding-top:14px}
 .dropzone{border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;color:var(--muted);font-size:13.5px}
 .import-summary{background:var(--bg);border-radius:8px;padding:10px 12px;font-size:13px;margin-top:10px}
@@ -258,6 +273,16 @@ input[type=file]{font-size:13px}
       <button class="modal-close" data-close="welder-form-overlay">&times;</button>
     </div>
     <div id="wf-body"></div>
+  </div>
+</div>
+
+<div class="overlay" id="photo-tool-overlay">
+  <div class="modal" style="max-width:980px">
+    <div class="modal-head">
+      <h2 id="photo-tool-title"></h2>
+      <button class="modal-close" id="photo-tool-close-x">&times;</button>
+    </div>
+    <div id="photo-tool-body"></div>
   </div>
 </div>
 
