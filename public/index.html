@@ -2,14 +2,14 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<title>CS Wind Welder Certification Control</title>
+<title>Quản lý chứng chỉ thợ hàn của CS WIND</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
   --bg:#f5f7fa; --card:#ffffff; --ink:#1a2433; --muted:#5b6b7d; --line:#e2e8f0;
-  --brand:#0b3d91; --brand2:#1558c7; --ok:#1a8f5e; --warn:#ca8a04; --bad:#c2410c;
+  --brand:#0b3d91; --brand2:#1558c7; --ok:#1a8f5e; --warn:#ca8a04; --bad:#c2410c; --purple:#7c3aed;
   --badge-ok-bg:#e6f6ee; --badge-warn-bg:#fef9c3; --badge-bad-bg:#ffedd5; --chip-bg:#eef1f5;
   --readonly-bg:#fdf3dc; --readonly-border:#f0dfa8; --readonly-ink:#7a5c00;
   --info-bg:#eaf1fc; --info-border:#c9dbf7; --info-ink:#123a73;
@@ -20,7 +20,7 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#0d1420; --card:#161f2c; --ink:#e8edf5; --muted:#93a1b8; --line:#2a3547;
-    --brand:#3d7fe0; --brand2:#5b9bf0; --ok:#34d399; --warn:#f0c53e; --bad:#f0733f;
+    --brand:#3d7fe0; --brand2:#5b9bf0; --ok:#34d399; --warn:#f0c53e; --bad:#f0733f; --purple:#b794f6;
     --badge-ok-bg:#0f3324; --badge-warn-bg:#3a2f0d; --badge-bad-bg:#3a2010; --chip-bg:#212b3a;
     --readonly-bg:#332a0c; --readonly-border:#5c4d18; --readonly-ink:#f0d888;
     --info-bg:#12233c; --info-border:#254876; --info-ink:#bcd6fb;
@@ -31,7 +31,7 @@
 }
 :root[data-theme="dark"]{
   --bg:#0d1420; --card:#161f2c; --ink:#e8edf5; --muted:#93a1b8; --line:#2a3547;
-  --brand:#3d7fe0; --brand2:#5b9bf0; --ok:#34d399; --warn:#f0c53e; --bad:#f0733f;
+  --brand:#3d7fe0; --brand2:#5b9bf0; --ok:#34d399; --warn:#f0c53e; --bad:#f0733f; --purple:#b794f6;
   --badge-ok-bg:#0f3324; --badge-warn-bg:#3a2f0d; --badge-bad-bg:#3a2010; --chip-bg:#212b3a;
   --readonly-bg:#332a0c; --readonly-border:#5c4d18; --readonly-ink:#f0d888;
   --info-bg:#12233c; --info-border:#254876; --info-ink:#bcd6fb;
@@ -43,7 +43,8 @@
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 header.top{background:var(--brand);color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 header.top .brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:24px;line-height:1.2;letter-spacing:.01em}
-header.top .brand .logo{width:40px;height:40px;flex:none;border-radius:9px;background:#fff;color:var(--brand);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px}
+header.top .brand .logo{flex:none;height:46px;padding:5px 10px;border-radius:9px;background:#fff;display:flex;align-items:center;justify-content:center}
+header.top .brand .logo img{height:36px;width:auto;display:block}
 header.top .clock{font-size:13px;opacity:.92;font-variant-numeric:tabular-nums}
 .session-badge{font-size:12px;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.16);border-radius:99px;padding:4px 10px 4px 4px;white-space:nowrap}
 .session-badge .role-pill{padding:1px 8px;border-radius:99px;font-weight:800;font-size:10.5px;text-transform:uppercase;letter-spacing:.02em}
@@ -172,17 +173,18 @@ input[type=file]{font-size:13px}
 .entity-btn:disabled:hover{border-color:var(--line)}
 /* Fixed "back to top" button -- stays in place on the right side while the page scrolls,
    works the same across the Lookup grid, Admin panel and the standalone welder page. */
-#back-to-top{position:fixed;right:18px;bottom:24px;width:46px;height:46px;border-radius:50%;
-  background:var(--brand);color:#fff;border:none;font-size:20px;font-weight:800;cursor:pointer;
-  box-shadow:var(--shadow);z-index:60;display:flex;align-items:center;justify-content:center}
-#back-to-top:hover{background:var(--brand2)}
-@media (max-width:600px){ header.top .brand{font-size:19px;gap:10px} header.top .brand .logo{width:34px;height:34px;font-size:15px} main{padding:10px} .stat{gap:8px} .cert-edit-grid{grid-template-columns:1fr} .session-badge{display:none} #back-to-top{right:12px;bottom:70px;width:42px;height:42px} }
+/* update11: bigger "top" button + "middle" (=) and "bottom" (↓) buttons stacked under it */
+.scroll-nav{position:fixed;right:18px;bottom:24px;display:flex;flex-direction:column;gap:10px;z-index:60}
+.scroll-nav button{width:56px;height:56px;border-radius:50%;background:var(--brand);color:#fff;border:none;
+  font-size:28px;font-weight:800;line-height:1;cursor:pointer;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center}
+.scroll-nav button:hover{background:var(--brand2)}
+@media (max-width:600px){ header.top .brand{font-size:18px;gap:10px} header.top .brand .logo{height:38px;padding:4px 8px} header.top .brand .logo img{height:30px} main{padding:10px} .stat{gap:8px} .cert-edit-grid{grid-template-columns:1fr} .session-badge{display:none} .scroll-nav{right:10px;bottom:20px;gap:8px} .scroll-nav button{width:48px;height:48px;font-size:24px} }
 </style>
 </head>
 <body>
 
 <header class="top">
-  <div class="brand"><span class="logo">CS</span> <span id="app-title">CS Wind Welder Certification Control</span></div>
+  <div class="brand"><span class="logo"><img src="/logo-cswind-gbc.png" alt="CS WIND GBC"></span> <span id="app-title">Quản lý chứng chỉ thợ hàn của CS WIND</span></div>
   <div class="row" style="gap:14px">
     <div class="session-badge" id="session-badge" style="display:none"></div>
     <div class="clock" id="live-clock">--:--:--</div>
@@ -286,7 +288,11 @@ input[type=file]{font-size:13px}
 
 <div class="toast" id="toast"></div>
 
-<button type="button" id="back-to-top" aria-label="Về đầu trang" title="Về đầu trang">↑</button>
+<div class="scroll-nav" id="scroll-nav">
+  <button type="button" id="back-to-top" aria-label="Về đầu trang" title="Về đầu trang">↑</button>
+  <button type="button" id="scroll-mid" aria-label="Đến giữa trang" title="Đến giữa trang">=</button>
+  <button type="button" id="scroll-bottom" aria-label="Xuống cuối trang" title="Xuống cuối trang">↓</button>
+</div>
 
 <script src="app.js"></script>
 </body>

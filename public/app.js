@@ -200,12 +200,14 @@ function handleWriteError(err){
 
 /* ================= LANGUAGE ================= */
 const L_VI = {
-  appTitle: 'CS Wind Welder Certification Control',
+  appTitle: 'Quản lý chứng chỉ thợ hàn của CS WIND',
   tabLookup: 'Tra cứu', tabAdmin: 'Quản trị',
   searchPlaceholder: 'Tìm theo mã thợ hàn, mã nhân viên hoặc họ tên…',
   filterAll: 'Tất cả trạng thái',
   statusOk: 'Còn hạn', statusWarn: 'Sắp hết hạn', statusBad: 'Hết hạn', statusNone: 'Chưa có chứng chỉ',
   statTotal: 'Tổng số thợ hàn', statOk: 'Còn hạn', statWarn: 'Sắp hết hạn', statBad: 'Hết hạn',
+  statCertTotal: 'Tổng số chứng chỉ', statCertOk: 'Chứng chỉ còn hạn', statCertWarn: 'Chứng chỉ sắp hết hạn', statCertBad: 'Chứng chỉ đã hết hạn', statNoCert: 'Số người không có chứng chỉ',
+  scrollMidLabel: 'Đến giữa trang', scrollBottomLabel: 'Xuống cuối trang',
   certsSuffix: 'chứng chỉ',
   noResults: 'Không tìm thấy thợ hàn phù hợp.',
   qrScanHint: 'Quét mã QR để xem thông tin này trực tiếp trên điện thoại — không cần mạng.',
@@ -265,7 +267,7 @@ const L_VI = {
   importResult: (added,updated)=>`Đã thêm ${added} thợ hàn mới, cập nhật ${updated} thợ hàn đã có.`,
   importNoRows: 'Không đọc được dòng dữ liệu nào phù hợp trong file — kiểm tra lại định dạng cột.',
   importParsing: 'Đang đọc file…',
-  qrInfoHeader: 'CS Wind Welder Certification Control', qrInfoNameLabel: 'Họ tên', qrInfoCodeLabel: 'Mã', qrInfoEmpIdLabel: 'Mã NV',
+  qrInfoHeader: 'Quản lý chứng chỉ thợ hàn của CS WIND', qrInfoNameLabel: 'Họ tên', qrInfoCodeLabel: 'Mã', qrInfoEmpIdLabel: 'Mã NV',
   qrInfoCompanyLabel: 'Công ty', qrInfoStatusLabel: 'Trạng thái', qrInfoCertsHeading: 'Chứng chỉ:',
   qrInfoValidDateLabel: 'Ngày hết hạn', qrInfoMoreLabel: 'Xem đầy đủ', qrInfoNoCerts: 'Chưa có chứng chỉ được ghi nhận.',
   qrInfoUpdatedLabel: 'Cập nhật hồ sơ', profileUpdatedLabel: 'Cập nhật hồ sơ',
@@ -333,12 +335,14 @@ const L_VI = {
   entityLastError: 'Không thể xoá — đây là entity duy nhất còn lại.',
 };
 const L_EN = {
-  appTitle: 'CS Wind Welder Certification Control',
+  appTitle: 'CS WIND Welder Certification Control',
   tabLookup: 'Lookup', tabAdmin: 'Admin',
   searchPlaceholder: 'Search by welder ID, employee ID or name…',
   filterAll: 'All statuses',
   statusOk: 'Valid', statusWarn: 'Expiring soon', statusBad: 'Expired', statusNone: 'No certificates',
   statTotal: 'Total welders', statOk: 'Valid', statWarn: 'Expiring soon', statBad: 'Expired',
+  statCertTotal: 'Total certificates', statCertOk: 'Valid certificates', statCertWarn: 'Certificates expiring soon', statCertBad: 'Expired certificates', statNoCert: 'People without certificates',
+  scrollMidLabel: 'Go to middle of page', scrollBottomLabel: 'Go to bottom of page',
   certsSuffix: 'certificates',
   noResults: 'No matching welders found.',
   qrScanHint: 'Scan the QR code to see this information directly on a phone — no network needed.',
@@ -398,7 +402,7 @@ const L_EN = {
   importResult: (added,updated)=>`Added ${added} new welder(s), updated ${updated} existing welder(s).`,
   importNoRows: 'No matching data rows could be read from this file — check the column format.',
   importParsing: 'Reading file…',
-  qrInfoHeader: 'CS Wind Welder Certification Control', qrInfoNameLabel: 'Name', qrInfoCodeLabel: 'ID', qrInfoEmpIdLabel: 'Employee ID',
+  qrInfoHeader: 'CS WIND Welder Certification Control', qrInfoNameLabel: 'Name', qrInfoCodeLabel: 'ID', qrInfoEmpIdLabel: 'Employee ID',
   qrInfoCompanyLabel: 'Company', qrInfoStatusLabel: 'Status', qrInfoCertsHeading: 'Certificates:',
   qrInfoValidDateLabel: 'Valid until', qrInfoMoreLabel: 'Full profile', qrInfoNoCerts: 'No certificates recorded.',
   qrInfoUpdatedLabel: 'Record updated', profileUpdatedLabel: 'Record updated',
@@ -497,8 +501,10 @@ function renderStaticText(){
   $('.theme-btn[data-theme-choice="light"]').textContent = L.themeLight;
   $('.theme-btn[data-theme-choice="dark"]').textContent = L.themeDark;
   $('.theme-btn[data-theme-choice="system"]').textContent = L.themeSystem;
-  if($('#back-to-top')) $('#back-to-top').title = L.backToTopLabel;
-  if($('#back-to-top')) $('#back-to-top').setAttribute('aria-label', L.backToTopLabel);
+  [['#back-to-top', L.backToTopLabel], ['#scroll-mid', L.scrollMidLabel], ['#scroll-bottom', L.scrollBottomLabel]].forEach(([sel, label])=>{
+    const b = $(sel); if(!b) return;
+    b.title = label; b.setAttribute('aria-label', label);
+  });
   renderSessionBadge();
 }
 
@@ -796,22 +802,31 @@ async function logoutAdmin(){
 }
 
 /* ================= RENDER: PUBLIC LOOKUP ================= */
+// Lookup-tab summary (update11): counted per CERTIFICATE (each judged with its entity's
+// warning window), plus welders who have no certificate at all.
 function computeStats(){
-  let ok=0, warn=0, bad=0;
+  let certs=0, ok=0, warn=0, bad=0, noCert=0;
   const list = weldersInActiveEntity();
   list.forEach(w=>{
-    const st = welderOverallStatus(w);
-    if(st==='ok') ok++; else if(st==='warn') warn++; else if(st==='bad') bad++;
+    const cs = w.certificates || [];
+    if(!cs.length){ noCert++; return; }
+    cs.forEach(c=>{
+      certs++;
+      const st = certStatus(c.validDate, w.entity);
+      if(st==='ok') ok++; else if(st==='warn') warn++; else if(st==='bad') bad++;
+    });
   });
-  return {total: list.length, ok, warn, bad};
+  return {total: list.length, certs, ok, warn, bad, noCert};
 }
 function renderStats(){
   const s = computeStats();
   $('#stat-row').innerHTML = `
     <div class="box"><div class="n">${s.total}</div><div class="l">${L.statTotal}</div></div>
-    <div class="box"><div class="n" style="color:var(--ok)">${s.ok}</div><div class="l">${L.statOk}</div></div>
-    <div class="box"><div class="n" style="color:var(--warn)">${s.warn}</div><div class="l">${L.statWarn} (≤ ${warnDaysFor(activeEntity)})</div></div>
-    <div class="box"><div class="n" style="color:var(--bad)">${s.bad}</div><div class="l">${L.statBad}</div></div>
+    <div class="box"><div class="n" style="color:var(--brand2)">${s.certs}</div><div class="l">${L.statCertTotal}</div></div>
+    <div class="box"><div class="n" style="color:var(--ok)">${s.ok}</div><div class="l">${L.statCertOk}</div></div>
+    <div class="box"><div class="n" style="color:var(--warn)">${s.warn}</div><div class="l">${L.statCertWarn} (≤ ${warnDaysFor(activeEntity)})</div></div>
+    <div class="box"><div class="n" style="color:var(--bad)">${s.bad}</div><div class="l">${L.statCertBad}</div></div>
+    <div class="box"><div class="n" style="color:var(--purple)">${s.noCert}</div><div class="l">${L.statNoCert}</div></div>
   `;
 }
 function distinctJoints(){
@@ -1934,7 +1949,10 @@ function bindStaticEvents(){
     };
   });
   $('#search-box').oninput = renderPublicGrid;
+  const pageMax = ()=> Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
   if($('#back-to-top')) $('#back-to-top').onclick = ()=> window.scrollTo({top:0, behavior:'smooth'});
+  if($('#scroll-mid')) $('#scroll-mid').onclick = ()=> window.scrollTo({top:Math.round(pageMax()/2), behavior:'smooth'});
+  if($('#scroll-bottom')) $('#scroll-bottom').onclick = ()=> window.scrollTo({top:pageMax(), behavior:'smooth'});
   $all('.lang-btn').forEach(btn=>{
     btn.onclick = ()=> setLang(btn.dataset.lang);
   });
