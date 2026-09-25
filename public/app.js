@@ -206,7 +206,7 @@ const L_VI = {
   filterAll: 'Tất cả trạng thái',
   statusOk: 'Còn hạn', statusWarn: 'Sắp hết hạn', statusBad: 'Hết hạn', statusNone: 'Chưa có chứng chỉ',
   statTotal: 'Tổng số thợ hàn', statOk: 'Còn hạn', statWarn: 'Sắp hết hạn', statBad: 'Hết hạn',
-  statCertTotal: 'Tổng số chứng chỉ', statCertOk: 'Chứng chỉ còn hạn', statCertWarn: 'Chứng chỉ sắp hết hạn', statCertBad: 'Chứng chỉ đã hết hạn', statNoCert: 'Số người không có chứng chỉ',
+  statCertTotal: 'Tổng số chứng chỉ', statCertOk: 'Chứng chỉ còn hạn', statCertWarn: 'Chứng chỉ sắp hết hạn', statCertBad: 'Chứng chỉ đã hết hạn', statNoCert: 'Số người không có chứng chỉ', statCertNoDate: 'Chứng chỉ chưa có ngày hết hạn',
   scrollMidLabel: 'Đến giữa trang', scrollBottomLabel: 'Xuống cuối trang',
   certsSuffix: 'chứng chỉ',
   noResults: 'Không tìm thấy thợ hàn phù hợp.',
@@ -341,7 +341,7 @@ const L_EN = {
   filterAll: 'All statuses',
   statusOk: 'Valid', statusWarn: 'Expiring soon', statusBad: 'Expired', statusNone: 'No certificates',
   statTotal: 'Total welders', statOk: 'Valid', statWarn: 'Expiring soon', statBad: 'Expired',
-  statCertTotal: 'Total certificates', statCertOk: 'Valid certificates', statCertWarn: 'Certificates expiring soon', statCertBad: 'Expired certificates', statNoCert: 'People without certificates',
+  statCertTotal: 'Total certificates', statCertOk: 'Valid certificates', statCertWarn: 'Certificates expiring soon', statCertBad: 'Expired certificates', statNoCert: 'People without certificates', statCertNoDate: 'Certificates without an expiry date',
   scrollMidLabel: 'Go to middle of page', scrollBottomLabel: 'Go to bottom of page',
   certsSuffix: 'certificates',
   noResults: 'No matching welders found.',
@@ -805,7 +805,7 @@ async function logoutAdmin(){
 // Lookup-tab summary (update11): counted per CERTIFICATE (each judged with its entity's
 // warning window), plus welders who have no certificate at all.
 function computeStats(){
-  let certs=0, ok=0, warn=0, bad=0, noCert=0;
+  let certs=0, ok=0, warn=0, bad=0, noCert=0, noDate=0;
   const list = weldersInActiveEntity();
   list.forEach(w=>{
     const cs = w.certificates || [];
@@ -813,10 +813,12 @@ function computeStats(){
     cs.forEach(c=>{
       certs++;
       const st = certStatus(c.validDate, w.entity);
-      if(st==='ok') ok++; else if(st==='warn') warn++; else if(st==='bad') bad++;
+      if(st==='ok') ok++; else if(st==='warn') warn++; else if(st==='bad') bad++; else noDate++;
     });
   });
-  return {total: list.length, certs, ok, warn, bad, noCert};
+  // certs === ok + warn + bad + noDate, always (update12: undated certificates were counted
+  // in the total but in no bucket, so the boxes didn't add up).
+  return {total: list.length, certs, ok, warn, bad, noCert, noDate};
 }
 function renderStats(){
   const s = computeStats();
@@ -827,6 +829,7 @@ function renderStats(){
     <div class="box"><div class="n" style="color:var(--warn)">${s.warn}</div><div class="l">${L.statCertWarn} (≤ ${warnDaysFor(activeEntity)})</div></div>
     <div class="box"><div class="n" style="color:var(--bad)">${s.bad}</div><div class="l">${L.statCertBad}</div></div>
     <div class="box"><div class="n" style="color:var(--purple)">${s.noCert}</div><div class="l">${L.statNoCert}</div></div>
+    ${s.noDate ? `<div class="box"><div class="n" style="color:var(--muted)">${s.noDate}</div><div class="l">${L.statCertNoDate}</div></div>` : ''}
   `;
 }
 function distinctJoints(){
@@ -842,29 +845,44 @@ function renderLookupFilterBar(){
     distinctProcesses().map(p=>`<option value="${esc(p)}" ${lkProcess===p?'selected':''}>${esc(p)}</option>`).join('');
   $('#filter-joint').innerHTML = `<option value="">${L.filterSegmentAll}</option>` +
     distinctJoints().map(j=>`<option value="${esc(j)}" ${lkJoint===j?'selected':''}>${esc(j)}</option>`).join('');
-  $('#status-chip-row').innerHTML = `
-    <button type="button" class="status-chip ${lkStatus===''?'active':''}" data-status="">${L.filterAllShort}</button>
-    <button type="button" class="status-chip st-ok ${lkStatus==='ok'?'active':''}" data-status="ok"><span class="dot"></span>${L.statusOk}</button>
-    <button type="button" class="status-chip st-warn ${lkStatus==='warn'?'active':''}" data-status="warn"><span class="dot"></span>${L.statusWarn}</button>
-    <button type="button" class="status-chip st-bad ${lkStatus==='bad'?'active':''}" data-status="bad"><span class="dot"></span>${L.statusBad}</button>
-  `;
   $('#filter-process').onchange = ()=>{ lkProcess = $('#filter-process').value; renderPublicGrid(); };
   $('#filter-joint').onchange = ()=>{ lkJoint = $('#filter-joint').value; renderPublicGrid(); };
-  $all('#status-chip-row .status-chip').forEach(btn=>{
-    btn.onclick = ()=>{ lkStatus = btn.dataset.status; renderLookupFilterBar(); renderPublicGrid(); };
-  });
+  renderStatusChips();
 }
-function renderPublicGrid(){
+// Welders of the active entity matching the search box + process + production-stage filters
+// (everything EXCEPT the status chip) -- the chip counts are computed from this, so they always
+// match what the search currently shows.
+function lookupBaseList(){
   const q = ($('#search-box').value||'').trim().toLowerCase();
-  const grid = $('#public-grid');
-  const list = weldersInActiveEntity().filter(w=>{
-    const st = welderOverallStatus(w);
-    if(lkStatus && st !== lkStatus) return false;
+  return weldersInActiveEntity().filter(w=>{
     if(lkProcess && !w.certificates.some(c=>(c.process||'').trim()===lkProcess)) return false;
     if(lkJoint && !w.certificates.some(c=>(c.joint||'').trim()===lkJoint)) return false;
     if(!q) return true;
     return w.idWelder.toLowerCase().includes(q) || (w.idEmployee||'').toLowerCase().includes(q) || w.name.toLowerCase().includes(q);
   });
+}
+function renderStatusChips(){
+  const row = $('#status-chip-row');
+  if(!row) return;
+  const base = lookupBaseList();
+  const n = {ok:0, warn:0, bad:0, none:0};
+  base.forEach(w=>{ n[welderOverallStatus(w)]++; });
+  const chip = (st, cls, label, count)=>
+    `<button type="button" class="status-chip ${cls} ${lkStatus===st?'active':''}" data-status="${st}">${cls?'<span class="dot"></span>':''}${label} <span class="chip-count">(${count})</span></button>`;
+  row.innerHTML =
+    chip('', '', L.filterAllShort, base.length) +
+    chip('ok', 'st-ok', L.statusOk, n.ok) +
+    chip('warn', 'st-warn', L.statusWarn, n.warn) +
+    chip('bad', 'st-bad', L.statusBad, n.bad) +
+    (n.none || lkStatus==='none' ? chip('none', 'st-none', L.statusNone, n.none) : '');
+  row.querySelectorAll('.status-chip').forEach(btn=>{
+    btn.onclick = ()=>{ lkStatus = btn.dataset.status; renderPublicGrid(); };
+  });
+}
+function renderPublicGrid(){
+  renderStatusChips();
+  const grid = $('#public-grid');
+  const list = lookupBaseList().filter(w=> !lkStatus || welderOverallStatus(w) === lkStatus);
   if(!list.length){
     grid.innerHTML = `<div class="muted" style="padding:20px">${L.noResults}</div>`;
     return;
