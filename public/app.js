@@ -284,6 +284,11 @@ const L_VI = {
   photoReadError: 'Không đọc được ảnh này — vui lòng chọn file ảnh khác.',
   uploadPhotoBtn: 'Chọn ảnh…', deleteTitle: idw=>`Xoá thợ hàn ${idw}`,
   reminderExpiringTitle: 'Sắp / đã hết hạn — cần gia hạn', colRemaining: 'Còn lại',
+  reminderExpiringTitleCounts: (w,b,t)=>`Sắp (${w}) / đã hết hạn (${b}) — cần gia hạn (${t})`,
+  expStatCerts: 'Tổng số chứng chỉ nhắc nhở',
+  expStatPeopleRenew: 'Tổng số người có chứng chỉ cần gia hạn',
+  expStatPeopleWarn: 'Tổng số người có chứng chỉ sắp hết hạn',
+  colNo: 'No.',
   daysRemaining: n=>`${n} ngày`, daysOverdue: n=>`Quá hạn ${n} ngày`,
   themeLight: 'Trắng', themeDark: 'Đen', themeSystem: 'Hệ thống',
   selectedCount: n=>`Đã chọn ${n}`, deleteSelectedBtn: 'Xoá mục đã chọn', refreshBtn: 'Làm mới',
@@ -395,6 +400,11 @@ const L_EN = {
   photoReadError: 'Could not read this image — please choose another file.',
   uploadPhotoBtn: 'Choose photo…', deleteTitle: idw=>`Delete welder ${idw}`,
   reminderExpiringTitle: 'Expiring / already expired — needs renewal', colRemaining: 'Remaining',
+  reminderExpiringTitleCounts: (w,b,t)=>`Expiring (${w}) / already expired (${b}) — needs renewal (${t})`,
+  expStatCerts: 'Total certificates in reminder',
+  expStatPeopleRenew: 'People with certificates needing renewal',
+  expStatPeopleWarn: 'People with certificates expiring soon',
+  colNo: 'No.',
   daysRemaining: n=>`${n} day(s)`, daysOverdue: n=>`${n} day(s) overdue`,
   themeLight: 'Light', themeDark: 'Dark', themeSystem: 'System',
   selectedCount: n=>`${n} selected`, deleteSelectedBtn: 'Delete selected', refreshBtn: 'Refresh',
@@ -966,7 +976,8 @@ function renderAdmin(){
     ${session.role==='superadmin' ? renderAccountsCardHtml() : ''}
 
     <div class="card">
-      <h2>${L.reminderExpiringTitle}</h2>
+      <h2 id="expiring-title">${L.reminderExpiringTitle}</h2>
+      <div class="stat" id="expiring-stats"></div>
       <div id="expiring-table-wrap"></div>
       <h2 style="margin-top:18px">${L.reminderTitle}</h2>
       <div id="reminder-recipients-line" class="small muted" style="margin-bottom:8px"></div>
@@ -1234,16 +1245,27 @@ function renderExpiringTable(){
   const el = $('#expiring-table-wrap');
   if(!el) return;
   const list = expiringList();
+  // Counts shown in the heading + summary boxes (always for the currently selected entity).
+  const nWarn = list.filter(x=>x.status==='warn').length;
+  const nBad = list.filter(x=>x.status==='bad').length;
+  const peopleAll = new Set(list.map(x=>x.idWelder)).size;
+  const peopleWarn = new Set(list.filter(x=>x.status==='warn').map(x=>x.idWelder)).size;
+  if($('#expiring-title')) $('#expiring-title').textContent = L.reminderExpiringTitleCounts(nWarn, nBad, list.length);
+  if($('#expiring-stats')) $('#expiring-stats').innerHTML = `
+    <div class="box"><div class="n">${list.length}</div><div class="l">${L.expStatCerts}</div></div>
+    <div class="box"><div class="n" style="color:var(--bad)">${peopleAll}</div><div class="l">${L.expStatPeopleRenew}</div></div>
+    <div class="box"><div class="n" style="color:var(--warn)">${peopleWarn}</div><div class="l">${L.expStatPeopleWarn}</div></div>`;
   if(!list.length){
     el.innerHTML = `<div class="muted small" style="padding:6px 0 12px">${L.reminderPreviewNone}</div>`;
     return;
   }
   const today = new Date(todayISO());
-  const rows = list.map(x=>{
+  const rows = list.map((x,i)=>{
     const vd = new Date(x.validDate);
     const diffDays = Math.round((vd - today) / 86400000);
     const remain = diffDays >= 0 ? L.daysRemaining(diffDays) : L.daysOverdue(Math.abs(diffDays));
     return `<tr>
+      <td>${i+1}</td>
       <td>${esc(x.name)}</td>
       <td>${esc(x.idWelder)}</td>
       <td>${esc(x.process||'—')}</td>
@@ -1252,8 +1274,8 @@ function renderExpiringTable(){
       <td>${statusBadge(x.status)}</td>
     </tr>`;
   }).join('');
-  el.innerHTML = `<div style="overflow-x:auto"><table>
-    <thead><tr><th>${L.colName}</th><th>${L.colCode}</th><th>${L.colProcess}</th><th>${L.colValidUntil}</th><th>${L.colRemaining}</th><th>${L.colStatusShort}</th></tr></thead>
+  el.innerHTML = `<div style="overflow-x:auto"><table style="white-space:nowrap">
+    <thead><tr><th style="width:48px">${L.colNo}</th><th>${L.colName}</th><th>${L.colCode}</th><th>${L.colProcess}</th><th>${L.colValidUntil}</th><th>${L.colRemaining}</th><th>${L.colStatusShort}</th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
 }
