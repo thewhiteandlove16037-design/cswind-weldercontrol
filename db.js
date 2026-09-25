@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   id SERIAL PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('superadmin','editor','viewer')),
+  role TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -110,6 +110,26 @@ async function initSchema() {
   // NOT EXISTS above only affects brand-new tables) -- idempotent, safe to run every boot.
   await pool.query(`ALTER TABLE welders ADD COLUMN IF NOT EXISTS entity TEXT NOT NULL DEFAULT 'CSW-VN'`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_welders_entity ON welders(entity)`);
+  // "Last reminder sent" bookkeeping (update7) -- written by the Gmail/Apps Script ack call
+  // or by a direct SMTP send, shown in the admin UI. Idempotent, safe on the live database.
+  await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS last_reminder_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS last_reminder_count INTEGER`);
+  await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS last_reminder_to TEXT`);
+  await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS last_reminder_via TEXT`);
+  // --- update9: entity admins + per-entity settings/recipients (all idempotent) ---
+  // Accounts: optional entity scope (NULL = global, as before) and a 4th role 'entityadmin'.
+  // The old inline CHECK (named accounts_role_check by Postgres) only allowed 3 roles --
+  // replace it with one that also allows entityadmin. Drop+add is safe on every boot.
+  await pool.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS entity TEXT`);
+  await pool.query(`ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_role_check`);
+  await pool.query(`ALTER TABLE accounts ADD CONSTRAINT accounts_role_check CHECK (role IN ('superadmin','entityadmin','editor','viewer'))`);
+  // Entities: their own warning window, reminder recipients and "last reminder" info.
+  await pool.query(`ALTER TABLE entities ADD COLUMN IF NOT EXISTS warn_days INTEGER`);
+  await pool.query(`ALTER TABLE entities ADD COLUMN IF NOT EXISTS emails TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE entities ADD COLUMN IF NOT EXISTS last_reminder_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE entities ADD COLUMN IF NOT EXISTS last_reminder_count INTEGER`);
+  await pool.query(`ALTER TABLE entities ADD COLUMN IF NOT EXISTS last_reminder_to TEXT`);
+  await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS entity_settings_migrated BOOLEAN NOT NULL DEFAULT false`);
   // Seed a single settings row if none exists yet.
   await pool.query(
     `INSERT INTO settings (id, base_url, warn_days, emails)
@@ -121,6 +141,18 @@ async function initSchema() {
       `INSERT INTO entities (code, label, sort_order) VALUES ($1,$2,$3) ON CONFLICT (code) DO NOTHING`,
       [code, label, sortOrder]
     );
+  }
+  // Any entity without its own warning window inherits the global one (covers existing
+  // entities on first boot of update9 and entities created by older code).
+  await pool.query(`UPDATE entities SET warn_days = (SELECT warn_days FROM settings WHERE id = 1) WHERE warn_days IS NULL`);
+  // One-time: the old single, global recipient list was effectively CSW-VN's (all real
+  // data lives there) -- carry it over so reminders keep reaching the same people.
+  const { rows: mig } = await pool.query('SELECT entity_settings_migrated, emails FROM settings WHERE id = 1');
+  if (mig[0] && !mig[0].entity_settings_migrated) {
+    if ((mig[0].emails || '').trim()) {
+      await pool.query(`UPDATE entities SET emails = $1 WHERE code = 'CSW-VN' AND emails = ''`, [mig[0].emails.trim()]);
+    }
+    await pool.query('UPDATE settings SET entity_settings_migrated = true WHERE id = 1');
   }
 }
 

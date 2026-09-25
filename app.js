@@ -107,7 +107,9 @@ async function deleteActiveEntityFlow(){
     renderAll();
   }catch(e){
     if(handleWriteError(e)) return;
-    if(e.status===409 || (e.data && e.data.error==='entity_in_use')){
+    if(e.data && e.data.error==='entity_has_accounts'){
+      toast(L.entityHasAccountsError(e.data.count || 0));
+    }else if(e.status===409 || (e.data && e.data.error==='entity_in_use')){
       toast(L.entityInUseError((e.data && e.data.count) || 0));
     }else if(e.status===400 || (e.data && e.data.error==='last_entity')){
       toast(L.entityLastError);
@@ -198,12 +200,14 @@ function handleWriteError(err){
 
 /* ================= LANGUAGE ================= */
 const L_VI = {
-  appTitle: 'CSWIND QR-ID Thợ hàn',
+  appTitle: 'Quản lý chứng chỉ thợ hàn của CS WIND',
   tabLookup: 'Tra cứu', tabAdmin: 'Quản trị',
   searchPlaceholder: 'Tìm theo mã thợ hàn, mã nhân viên hoặc họ tên…',
   filterAll: 'Tất cả trạng thái',
   statusOk: 'Còn hạn', statusWarn: 'Sắp hết hạn', statusBad: 'Hết hạn', statusNone: 'Chưa có chứng chỉ',
   statTotal: 'Tổng số thợ hàn', statOk: 'Còn hạn', statWarn: 'Sắp hết hạn', statBad: 'Hết hạn',
+  statCertTotal: 'Tổng số chứng chỉ', statCertOk: 'Chứng chỉ còn hạn', statCertWarn: 'Chứng chỉ sắp hết hạn', statCertBad: 'Chứng chỉ đã hết hạn', statNoCert: 'Số người không có chứng chỉ', statCertNoDate: 'Chứng chỉ chưa có ngày hết hạn', filterNoDate: 'Chứng chỉ chưa có ngày hết hạn',
+  scrollMidLabel: 'Đến giữa trang', scrollBottomLabel: 'Xuống cuối trang',
   certsSuffix: 'chứng chỉ',
   noResults: 'Không tìm thấy thợ hàn phù hợp.',
   qrScanHint: 'Quét mã QR để xem thông tin này trực tiếp trên điện thoại — không cần mạng.',
@@ -225,14 +229,17 @@ const L_VI = {
   settingsWarnDays: 'Số ngày cảnh báo sắp hết hạn', settingsEmails: 'Danh sách email nhận nhắc nhở (phân cách bằng dấu phẩy)',
   settingsSave: 'Lưu cài đặt', settingsSaved: 'Đã lưu cài đặt.',
   reminderTitle: 'Soạn email nhắc nhở chứng chỉ sắp/đã hết hạn',
-  reminderWillSendTo: 'Sẽ gửi tới:', reminderNoEmails: 'Chưa có email nào trong Cài đặt — thêm email trước khi soạn.',
+  reminderWillSendTo: 'Sẽ gửi tới:', reminderNoEmails: 'Entity này chưa có email nhận nhắc nhở — thêm trong "Cài đặt entity" trước khi soạn.',
   reminderPreviewCount: n=>`${n} chứng chỉ sắp/đã hết hạn sẽ được đưa vào email.`,
   reminderPreviewNone: 'Hiện không có chứng chỉ nào sắp hoặc đã hết hạn.',
   reminderComposeBtn: 'Soạn email nhắc nhở', reminderSentToast: 'Đã mở email nhắc nhở — kiểm tra ứng dụng email của bạn.',
   reminderSendNowBtn: 'Gửi thử ngay (email thật)',
   reminderSentNowToast: n=>`Đã gửi email nhắc nhở thật (${n} chứng chỉ sắp/đã hết hạn).`,
-  reminderAutoConfigured: '✓ Đã cấu hình gửi tự động hàng tuần (thứ 2).',
-  reminderAutoNotConfigured: 'Chưa cấu hình gửi email tự động — cần thêm biến môi trường SMTP trên Render (xem DEPLOY.md).',
+  reminderAutoConfigured: '✓ App tự gửi email nhắc nhở qua SMTP — thứ 2 & thứ 6, 8:00.',
+  reminderAutoGmail: '✓ Gửi tự động qua Gmail (Google Apps Script) — thứ 2 & thứ 6, khoảng 8:00. Mỗi entity nhận email riêng, gửi tới danh sách email trong "Cài đặt entity".',
+  reminderAutoNotConfigured: 'Chưa bật gửi email tự động — làm theo mục "Gửi email nhắc nhở tự động qua Gmail" trong DEPLOY.md.',
+  reminderLastSent: (when,n,to)=>`Lần gửi gần nhất: ${when} — ${n} chứng chỉ${to ? ' → '+to : ''}.`,
+  reminderLastNone: 'Chưa ghi nhận lần gửi nào.',
   reminderSubjectLabel: 'Tiêu đề', reminderBodyLabel: 'Nội dung',
   reminderNoEmailsToast: 'Chưa có email người nhận — thêm trong Cài đặt.',
   masterListTitle: n=>`Danh sách tổng (${n} thợ hàn)`,
@@ -260,13 +267,13 @@ const L_VI = {
   importResult: (added,updated)=>`Đã thêm ${added} thợ hàn mới, cập nhật ${updated} thợ hàn đã có.`,
   importNoRows: 'Không đọc được dòng dữ liệu nào phù hợp trong file — kiểm tra lại định dạng cột.',
   importParsing: 'Đang đọc file…',
-  qrInfoHeader: 'CSWIND — QR-ID Thợ hàn', qrInfoNameLabel: 'Họ tên', qrInfoCodeLabel: 'Mã', qrInfoEmpIdLabel: 'Mã NV',
+  qrInfoHeader: 'Quản lý chứng chỉ thợ hàn của CS WIND', qrInfoNameLabel: 'Họ tên', qrInfoCodeLabel: 'Mã', qrInfoEmpIdLabel: 'Mã NV',
   qrInfoCompanyLabel: 'Công ty', qrInfoStatusLabel: 'Trạng thái', qrInfoCertsHeading: 'Chứng chỉ:',
   qrInfoValidDateLabel: 'Ngày hết hạn', qrInfoMoreLabel: 'Xem đầy đủ', qrInfoNoCerts: 'Chưa có chứng chỉ được ghi nhận.',
   qrInfoUpdatedLabel: 'Cập nhật hồ sơ', profileUpdatedLabel: 'Cập nhật hồ sơ',
   filterSegmentAll: 'Tất cả công đoạn SX', filterAllShort: 'Tất cả',
-  publicInfoBanner: 'Trang tra cứu công khai của CSWIND Việt Nam — ai có link cũng xem được, không cần tài khoản. Nhân viên có tài khoản đăng nhập ở tab Quản trị để thêm/sửa dữ liệu, xem báo cáo sắp hết hạn và in mã QR.',
-  accountsTitle: 'Quản lý tài khoản quản trị', accountsSuperOnlyNote: 'Chỉ Quản trị cấp cao mới thấy mục này',
+  publicInfoBanner: label=>`Trang tra cứu công khai của ${label} — ai có link cũng xem được, không cần tài khoản. Nhân viên có tài khoản đăng nhập ở tab Quản trị để thêm/sửa dữ liệu, xem báo cáo sắp hết hạn và in mã QR.`,
+  accountsTitle: 'Quản lý tài khoản quản trị', accountsSuperOnlyNote: 'Quản trị cấp cao thấy và quản lý mọi tài khoản',
   accountsGrantTitle: 'Cấp tài khoản quản trị mới', accountsDisplayName: 'Tên đăng nhập', accountsTempPin: 'Mật khẩu tạm thời',
   accountsRole: 'Cấp quyền', accountsRoleEditorHint: 'thêm/sửa dữ liệu', accountsCreateBtn: 'Tạo tài khoản', accountsResetPin: 'Đặt lại mật khẩu',
   accountsResetPinPrompt: name=>`Nhập mật khẩu mới cho ${name} (tối thiểu 4 ký tự):`,
@@ -277,10 +284,32 @@ const L_VI = {
   accountsConfirmDelete: name=>`Xoá tài khoản ${name}? Hành động này không thể hoàn tác.`,
   accountsLastSuperadmin: 'Không thể xoá — đây là Quản trị cấp cao duy nhất còn lại.',
   roleSuperadmin: 'Quản trị cấp cao', roleEditor: 'Quản trị viên', roleViewer: 'Chỉ xem',
+  roleEntityAdmin: 'Quản trị viên entity',
+  entityAdminLabel: code=>`Admin ${String(code).replace(/-/g,' ')}`,
+  scopedSuffix: code=>` (${String(code).replace(/-/g,' ')})`,
+  accountsEntity: 'Entity', accountsEntityAll: 'Tất cả entity',
+  accountsEntityRequired: 'Hãy chọn entity cho Quản trị viên entity.',
+  accountsScopeNoteEntity: label=>`Tài khoản tạo ở đây thuộc ${label} (chỉ cấp được "Quản trị viên" hoặc "Chỉ xem").`,
+  accountsEntityAdminNote: label=>`Chỉ quản lý tài khoản thuộc ${label}`,
+  entityReadOnlyBanner: (viewing, own)=>`Bạn đang xem ${viewing} ở chế độ chỉ xem — bạn chỉ được chỉnh sửa dữ liệu của ${own}.`,
+  entitySettingsTitle: label=>`Cài đặt entity: ${label}`,
+  entitySettingsHint: 'Số ngày cảnh báo và danh sách email nhận nhắc nhở riêng của entity này.',
+  entitySettingsSaved: 'Đã lưu cài đặt entity.',
+  entitySettingsInvalidEmail: list=>`Email không hợp lệ: ${list}`,
+  entitySettingsInvalidDays: 'Số ngày cảnh báo phải từ 1 đến 3650.',
+  settingsGlobalTitle: 'Cài đặt chung (toàn hệ thống)',
+  entityHasAccountsError: n=>`Không xoá được — còn ${n} tài khoản quản trị thuộc entity này. Xoá hoặc đổi entity của các tài khoản đó trước.`,
+  importSkippedOtherEntity: n=>`${n} thợ hàn bỏ qua vì thuộc entity khác`,
+  reminderEntityNote: label=>`Email nhắc nhở của ${label} chỉ gửi tới danh sách email của entity này.`,
   fieldPhoto: 'Ảnh thợ hàn', removePhotoBtn: 'Xoá ảnh', fieldOriginalCert: 'Chứng chỉ gốc',
   photoReadError: 'Không đọc được ảnh này — vui lòng chọn file ảnh khác.',
   uploadPhotoBtn: 'Chọn ảnh…', deleteTitle: idw=>`Xoá thợ hàn ${idw}`,
   reminderExpiringTitle: 'Sắp / đã hết hạn — cần gia hạn', colRemaining: 'Còn lại',
+  reminderExpiringTitleCounts: (w,b,t)=>`Sắp (${w}) / đã hết hạn (${b}) — cần gia hạn (${t})`,
+  expStatCerts: 'Tổng số chứng chỉ nhắc nhở',
+  expStatPeopleRenew: 'Tổng số người có chứng chỉ cần gia hạn',
+  expStatPeopleWarn: 'Tổng số người có chứng chỉ sắp hết hạn',
+  colNo: 'No.',
   daysRemaining: n=>`${n} ngày`, daysOverdue: n=>`Quá hạn ${n} ngày`,
   themeLight: 'Trắng', themeDark: 'Đen', themeSystem: 'Hệ thống',
   selectedCount: n=>`Đã chọn ${n}`, deleteSelectedBtn: 'Xoá mục đã chọn', refreshBtn: 'Làm mới',
@@ -306,12 +335,14 @@ const L_VI = {
   entityLastError: 'Không thể xoá — đây là entity duy nhất còn lại.',
 };
 const L_EN = {
-  appTitle: 'CSWIND QR-ID Welder',
+  appTitle: 'CS WIND Welder Certification Control',
   tabLookup: 'Lookup', tabAdmin: 'Admin',
   searchPlaceholder: 'Search by welder ID, employee ID or name…',
   filterAll: 'All statuses',
   statusOk: 'Valid', statusWarn: 'Expiring soon', statusBad: 'Expired', statusNone: 'No certificates',
   statTotal: 'Total welders', statOk: 'Valid', statWarn: 'Expiring soon', statBad: 'Expired',
+  statCertTotal: 'Total certificates', statCertOk: 'Valid certificates', statCertWarn: 'Certificates expiring soon', statCertBad: 'Expired certificates', statNoCert: 'People without certificates', statCertNoDate: 'Certificates without an expiry date', filterNoDate: 'No expiry date',
+  scrollMidLabel: 'Go to middle of page', scrollBottomLabel: 'Go to bottom of page',
   certsSuffix: 'certificates',
   noResults: 'No matching welders found.',
   qrScanHint: 'Scan the QR code to see this information directly on a phone — no network needed.',
@@ -333,14 +364,17 @@ const L_EN = {
   settingsWarnDays: 'Days before expiry to warn', settingsEmails: 'Reminder recipient emails (comma-separated)',
   settingsSave: 'Save settings', settingsSaved: 'Settings saved.',
   reminderTitle: 'Compose reminder email for expiring/expired certificates',
-  reminderWillSendTo: 'Will send to:', reminderNoEmails: 'No email set in Settings yet — add one before composing.',
+  reminderWillSendTo: 'Will send to:', reminderNoEmails: 'This entity has no reminder recipients yet — add them in "Entity settings" before composing.',
   reminderPreviewCount: n=>`${n} expiring/expired certificate(s) will be included.`,
   reminderPreviewNone: 'No certificates are currently expiring or expired.',
   reminderComposeBtn: 'Compose reminder email', reminderSentToast: 'Reminder email opened — check your email app.',
   reminderSendNowBtn: 'Send test now (real email)',
   reminderSentNowToast: n=>`Real reminder email sent (${n} expiring/expired certificate(s)).`,
-  reminderAutoConfigured: '✓ Automatic weekly (Monday) sending is configured.',
-  reminderAutoNotConfigured: 'Automatic email sending isn\'t configured yet — add SMTP environment variables on Render (see DEPLOY.md).',
+  reminderAutoConfigured: '✓ The app sends reminder emails via SMTP — Monday & Friday, 08:00.',
+  reminderAutoGmail: '✓ Automatic sending via Gmail (Google Apps Script) — Monday & Friday, around 08:00. Each entity gets its own email, sent to the recipients in "Entity settings".',
+  reminderAutoNotConfigured: 'Automatic email sending isn\'t enabled yet — follow "Automatic reminder emails via Gmail" in DEPLOY.md.',
+  reminderLastSent: (when,n,to)=>`Last sent: ${when} — ${n} certificate(s)${to ? ' → '+to : ''}.`,
+  reminderLastNone: 'No send recorded yet.',
   reminderSubjectLabel: 'Subject', reminderBodyLabel: 'Body',
   reminderNoEmailsToast: 'No recipient email — add one in Settings.',
   masterListTitle: n=>`Master list (${n} welders)`,
@@ -368,13 +402,13 @@ const L_EN = {
   importResult: (added,updated)=>`Added ${added} new welder(s), updated ${updated} existing welder(s).`,
   importNoRows: 'No matching data rows could be read from this file — check the column format.',
   importParsing: 'Reading file…',
-  qrInfoHeader: 'CSWIND — QR-ID Welder', qrInfoNameLabel: 'Name', qrInfoCodeLabel: 'ID', qrInfoEmpIdLabel: 'Employee ID',
+  qrInfoHeader: 'CS WIND Welder Certification Control', qrInfoNameLabel: 'Name', qrInfoCodeLabel: 'ID', qrInfoEmpIdLabel: 'Employee ID',
   qrInfoCompanyLabel: 'Company', qrInfoStatusLabel: 'Status', qrInfoCertsHeading: 'Certificates:',
   qrInfoValidDateLabel: 'Valid until', qrInfoMoreLabel: 'Full profile', qrInfoNoCerts: 'No certificates recorded.',
   qrInfoUpdatedLabel: 'Record updated', profileUpdatedLabel: 'Record updated',
   filterSegmentAll: 'All production stages', filterAllShort: 'All',
-  publicInfoBanner: 'CSWIND Vietnam public welder lookup — anyone with the link can view it, no account needed. Staff with an account sign in on the Admin tab to add/edit data, view the expiring report and print QR codes.',
-  accountsTitle: 'Manage admin accounts', accountsSuperOnlyNote: 'Only super admins see this section',
+  publicInfoBanner: label=>`${label} public welder lookup — anyone with the link can view it, no account needed. Staff with an account sign in on the Admin tab to add/edit data, view the expiring report and print QR codes.`,
+  accountsTitle: 'Manage admin accounts', accountsSuperOnlyNote: 'Super admins see and manage every account',
   accountsGrantTitle: 'Grant a new admin account', accountsDisplayName: 'Username', accountsTempPin: 'Temporary password',
   accountsRole: 'Permission level', accountsRoleEditorHint: 'add/edit data', accountsCreateBtn: 'Create account', accountsResetPin: 'Reset password',
   accountsResetPinPrompt: name=>`Enter a new password for ${name} (at least 4 characters):`,
@@ -385,10 +419,32 @@ const L_EN = {
   accountsConfirmDelete: name=>`Delete account ${name}? This cannot be undone.`,
   accountsLastSuperadmin: 'Cannot delete — this is the last remaining super admin.',
   roleSuperadmin: 'Super admin', roleEditor: 'Admin', roleViewer: 'View only',
+  roleEntityAdmin: 'Entity admin',
+  entityAdminLabel: code=>`Admin ${String(code).replace(/-/g,' ')}`,
+  scopedSuffix: code=>` (${String(code).replace(/-/g,' ')})`,
+  accountsEntity: 'Entity', accountsEntityAll: 'All entities',
+  accountsEntityRequired: 'Please choose an entity for the Entity admin.',
+  accountsScopeNoteEntity: label=>`Accounts created here belong to ${label} ("Admin" or "View only" only).`,
+  accountsEntityAdminNote: label=>`Only manages accounts of ${label}`,
+  entityReadOnlyBanner: (viewing, own)=>`You are viewing ${viewing} read-only — you can only edit ${own} data.`,
+  entitySettingsTitle: label=>`Entity settings: ${label}`,
+  entitySettingsHint: 'Warning window and reminder email recipients for this entity only.',
+  entitySettingsSaved: 'Entity settings saved.',
+  entitySettingsInvalidEmail: list=>`Invalid email: ${list}`,
+  entitySettingsInvalidDays: 'Warning days must be between 1 and 3650.',
+  settingsGlobalTitle: 'Global settings (whole system)',
+  entityHasAccountsError: n=>`Can't delete — ${n} admin account(s) still belong to this entity. Delete them or move them to another entity first.`,
+  importSkippedOtherEntity: n=>`${n} welder(s) skipped (belong to another entity)`,
+  reminderEntityNote: label=>`${label}'s reminder email only goes to this entity's own recipient list.`,
   fieldPhoto: 'Welder photo', removePhotoBtn: 'Remove photo', fieldOriginalCert: 'Original certificate',
   photoReadError: 'Could not read this image — please choose another file.',
   uploadPhotoBtn: 'Choose photo…', deleteTitle: idw=>`Delete welder ${idw}`,
   reminderExpiringTitle: 'Expiring / already expired — needs renewal', colRemaining: 'Remaining',
+  reminderExpiringTitleCounts: (w,b,t)=>`Expiring (${w}) / already expired (${b}) — needs renewal (${t})`,
+  expStatCerts: 'Total certificates in reminder',
+  expStatPeopleRenew: 'People with certificates needing renewal',
+  expStatPeopleWarn: 'People with certificates expiring soon',
+  colNo: 'No.',
   daysRemaining: n=>`${n} day(s)`, daysOverdue: n=>`${n} day(s) overdue`,
   themeLight: 'Light', themeDark: 'Dark', themeSystem: 'System',
   selectedCount: n=>`${n} selected`, deleteSelectedBtn: 'Delete selected', refreshBtn: 'Refresh',
@@ -423,18 +479,32 @@ function setLang(lang){
   renderStaticText();
   renderAll();
 }
+// Staff-only hint on the Lookup tab: hidden for guests (QR-scanning customers) and "View only"
+// accounts; names the entity currently selected instead of always "CSWIND Việt Nam".
+function renderPublicInfoBanner(){
+  const el = $('#public-info-banner');
+  if(!el) return;
+  const show = !!session && ['superadmin','entityadmin','editor'].includes(session.role);
+  el.style.display = show ? '' : 'none';
+  el.textContent = show ? L.publicInfoBanner(entityLabel(activeEntity)) : '';
+}
+function defaultCompanyFor(code){
+  return code==='CSW-VN' ? 'CSWIND Việt Nam' : entityLabel(code);
+}
 function renderStaticText(){
   $('#app-title').textContent = L.appTitle;
   $('#tabbtn-lookup').textContent = L.tabLookup;
   $('#tabbtn-admin').textContent = L.tabAdmin;
   $('#search-box').placeholder = L.searchPlaceholder;
   $('#readonly-banner').textContent = L.readOnlyBanner;
-  $('#public-info-banner').textContent = L.publicInfoBanner;
+  renderPublicInfoBanner();
   $('.theme-btn[data-theme-choice="light"]').textContent = L.themeLight;
   $('.theme-btn[data-theme-choice="dark"]').textContent = L.themeDark;
   $('.theme-btn[data-theme-choice="system"]').textContent = L.themeSystem;
-  if($('#back-to-top')) $('#back-to-top').title = L.backToTopLabel;
-  if($('#back-to-top')) $('#back-to-top').setAttribute('aria-label', L.backToTopLabel);
+  [['#back-to-top', L.backToTopLabel], ['#scroll-mid', L.scrollMidLabel], ['#scroll-bottom', L.scrollBottomLabel]].forEach(([sel, label])=>{
+    const b = $(sel); if(!b) return;
+    b.title = label; b.setAttribute('aria-label', label);
+  });
   renderSessionBadge();
 }
 
@@ -526,9 +596,16 @@ function readImageCompressed(file, maxDim, quality){
   });
 }
 
-function certStatus(validDate){
+function warnDaysFor(code){
+  const e = ENTITIES.find(x=>x.code===(code||activeEntity));
+  return (e && e.warnDays) || SETTINGS.warnDays || 45;
+}
+function activeEntityObj(){
+  return ENTITIES.find(x=>x.code===activeEntity) || {code:activeEntity, label:activeEntity, emails:''};
+}
+function certStatus(validDate, entityCode){
   if(!validDate) return 'none';
-  const warnDays = SETTINGS.warnDays || 45;
+  const warnDays = warnDaysFor(entityCode);
   const today = new Date(todayISO());
   const vd = new Date(validDate);
   const diffDays = Math.round((vd - today) / 86400000);
@@ -538,7 +615,7 @@ function certStatus(validDate){
 }
 function welderOverallStatus(w){
   if(!w.certificates || !w.certificates.length) return 'none';
-  const statuses = w.certificates.map(c=>certStatus(c.validDate));
+  const statuses = w.certificates.map(c=>certStatus(c.validDate, w.entity));
   if(statuses.includes('bad')) return 'bad';
   if(statuses.includes('warn')) return 'warn';
   return 'ok';
@@ -573,7 +650,7 @@ function renderSessionBadge(){
   if(!el) return;
   if(!session){ el.style.display = 'none'; el.innerHTML = ''; return; }
   el.style.display = 'flex';
-  el.innerHTML = `${esc(session.name)} <span class="role-pill r-${esc(session.role)}">${esc(roleLabel(session.role))}</span>`;
+  el.innerHTML = `${esc(session.name)} <span class="role-pill r-${esc(session.role)}">${esc(roleLabel(session.role, session.entity))}</span>`;
 }
 
 /* ================= DEEP LINKS (per-welder shareable URL, used by QR codes) =================
@@ -630,7 +707,7 @@ function buildQrInfoText(idWelder){
   lines.push(L.qrInfoCertsHeading);
   if(w.certificates.length){
     w.certificates.forEach(c=>{
-      const cs = certStatus(c.validDate);
+      const cs = certStatus(c.validDate, w.entity);
       lines.push(`- ${c.process||'—'}${c.type ? ' · '+c.type : ''} · ${L.qrInfoValidDateLabel}: ${fmtDate(c.validDate)} (${statusLabel(cs)})`);
     });
   }else{
@@ -658,20 +735,40 @@ function renderQrDataUrl(text, size){
 }
 
 /* ================= AUTH ================= */
-function roleLabel(role){
-  return {superadmin:L.roleSuperadmin, editor:L.roleEditor, viewer:L.roleViewer}[role] || role;
+function roleLabel(role, entity){
+  if(role==='entityadmin') return entity ? L.entityAdminLabel(entity) : L.roleEntityAdmin;
+  let base = {superadmin:L.roleSuperadmin, editor:L.roleEditor, viewer:L.roleViewer}[role] || role;
+  if(entity && (role==='editor' || role==='viewer')) base += L.scopedSuffix(entity);
+  return base;
+}
+/* Entity-scoped permissions (update9) -- mirror of src/auth.js; the server enforces the same
+   rules on every write, this only decides what the UI shows/enables. */
+function canWriteEntity(code){
+  if(!session) return false;
+  const r = session.role, e = session.entity;
+  if(r==='superadmin') return true;
+  if(r==='editor' && !e) return true;
+  if(r==='entityadmin' || r==='editor') return !!e && e===code;
+  return false;
+}
+function canManageEntitySettings(code){
+  return !!session && (session.role==='superadmin' || (session.role==='entityadmin' && session.entity===code));
+}
+function canManageAccounts(){
+  return !!session && (session.role==='superadmin' || (session.role==='entityadmin' && !!session.entity));
 }
 function isReadOnlyNow(){
-  return readOnlyMode || (session && session.role === 'viewer');
+  return readOnlyMode || !session || !canWriteEntity(activeEntity);
 }
 function canEditWelderData(){
-  return !!session && (session.role === 'editor' || session.role === 'superadmin');
+  return canWriteEntity(activeEntity);
 }
 function applyReadOnlyUi(){
   const banner = $('#readonly-banner');
   const show = !!(session && isReadOnlyNow());
   banner.style.display = show ? 'block' : 'none';
-  banner.textContent = L.readOnlyBanner;
+  const scopedOther = session && session.entity && session.role!=='viewer' && !readOnlyMode && !canWriteEntity(activeEntity);
+  banner.textContent = scopedOther ? L.entityReadOnlyBanner(entityLabel(activeEntity), entityLabel(session.entity)) : L.readOnlyBanner;
   $all('.write-action').forEach(el=>{ el.disabled = !!isReadOnlyNow(); });
 }
 async function tryLogin(username, password){
@@ -681,35 +778,58 @@ async function refreshSession(){
   try{ session = await apiFetch('GET', '/api/auth/me'); }
   catch(e){ session = null; }
 }
-function enterAdmin(acc){
+async function enterAdmin(acc){
   session = acc;
   readOnlyMode = false;
+  // Settings were first loaded anonymously (recipient emails are staff-only and come back
+  // empty) -- reload now that we're signed in, otherwise the Settings form shows an empty
+  // email box and a "Save settings" click would wipe the real recipient list. Entities are
+  // reloaded too: their reminder recipients are staff-only as well (update9).
+  try{ await Promise.all([loadSettings(), loadEntities()]); }catch(e){ /* keep what we have */ }
+  // Entity-scoped accounts land on their own entity right after signing in.
+  if(session && session.entity && ENTITIES.some(x=>x.code===session.entity)){
+    activeEntity = session.entity;
+    saveActiveEntity(activeEntity);
+  }
   renderAll();
 }
 async function logoutAdmin(){
   try{ await apiFetch('POST', '/api/auth/logout'); }catch(e){ /* cookie may already be gone */ }
   session = null;
   ACCOUNTS = [];
+  try{ await Promise.all([loadSettings(), loadEntities()]); }catch(e){ /* keep what we have */ }
   renderAll();
 }
 
 /* ================= RENDER: PUBLIC LOOKUP ================= */
+// Lookup-tab summary (update11): counted per CERTIFICATE (each judged with its entity's
+// warning window), plus welders who have no certificate at all.
 function computeStats(){
-  let ok=0, warn=0, bad=0;
+  let certs=0, ok=0, warn=0, bad=0, noCert=0, noDate=0;
   const list = weldersInActiveEntity();
   list.forEach(w=>{
-    const st = welderOverallStatus(w);
-    if(st==='ok') ok++; else if(st==='warn') warn++; else if(st==='bad') bad++;
+    const cs = w.certificates || [];
+    if(!cs.length){ noCert++; return; }
+    cs.forEach(c=>{
+      certs++;
+      const st = certStatus(c.validDate, w.entity);
+      if(st==='ok') ok++; else if(st==='warn') warn++; else if(st==='bad') bad++; else noDate++;
+    });
   });
-  return {total: list.length, ok, warn, bad};
+  // certs === ok + warn + bad + noDate, always (update12: undated certificates were counted
+  // in the total but in no bucket, so the boxes didn't add up).
+  return {total: list.length, certs, ok, warn, bad, noCert, noDate};
 }
 function renderStats(){
   const s = computeStats();
   $('#stat-row').innerHTML = `
     <div class="box"><div class="n">${s.total}</div><div class="l">${L.statTotal}</div></div>
-    <div class="box"><div class="n" style="color:var(--ok)">${s.ok}</div><div class="l">${L.statOk}</div></div>
-    <div class="box"><div class="n" style="color:var(--warn)">${s.warn}</div><div class="l">${L.statWarn} (≤ ${SETTINGS.warnDays||45})</div></div>
-    <div class="box"><div class="n" style="color:var(--bad)">${s.bad}</div><div class="l">${L.statBad}</div></div>
+    <div class="box"><div class="n" style="color:var(--brand2)">${s.certs}</div><div class="l">${L.statCertTotal}</div></div>
+    <div class="box"><div class="n" style="color:var(--ok)">${s.ok}</div><div class="l">${L.statCertOk}</div></div>
+    <div class="box"><div class="n" style="color:var(--warn)">${s.warn}</div><div class="l">${L.statCertWarn} (≤ ${warnDaysFor(activeEntity)})</div></div>
+    <div class="box"><div class="n" style="color:var(--bad)">${s.bad}</div><div class="l">${L.statCertBad}</div></div>
+    <div class="box"><div class="n" style="color:var(--purple)">${s.noCert}</div><div class="l">${L.statNoCert}</div></div>
+    ${s.noDate ? `<div class="box"><div class="n" style="color:var(--muted)">${s.noDate}</div><div class="l">${L.statCertNoDate}</div></div>` : ''}
   `;
 }
 function distinctJoints(){
@@ -725,29 +845,52 @@ function renderLookupFilterBar(){
     distinctProcesses().map(p=>`<option value="${esc(p)}" ${lkProcess===p?'selected':''}>${esc(p)}</option>`).join('');
   $('#filter-joint').innerHTML = `<option value="">${L.filterSegmentAll}</option>` +
     distinctJoints().map(j=>`<option value="${esc(j)}" ${lkJoint===j?'selected':''}>${esc(j)}</option>`).join('');
-  $('#status-chip-row').innerHTML = `
-    <button type="button" class="status-chip ${lkStatus===''?'active':''}" data-status="">${L.filterAllShort}</button>
-    <button type="button" class="status-chip st-ok ${lkStatus==='ok'?'active':''}" data-status="ok"><span class="dot"></span>${L.statusOk}</button>
-    <button type="button" class="status-chip st-warn ${lkStatus==='warn'?'active':''}" data-status="warn"><span class="dot"></span>${L.statusWarn}</button>
-    <button type="button" class="status-chip st-bad ${lkStatus==='bad'?'active':''}" data-status="bad"><span class="dot"></span>${L.statusBad}</button>
-  `;
   $('#filter-process').onchange = ()=>{ lkProcess = $('#filter-process').value; renderPublicGrid(); };
   $('#filter-joint').onchange = ()=>{ lkJoint = $('#filter-joint').value; renderPublicGrid(); };
-  $all('#status-chip-row .status-chip').forEach(btn=>{
-    btn.onclick = ()=>{ lkStatus = btn.dataset.status; renderLookupFilterBar(); renderPublicGrid(); };
-  });
+  renderStatusChips();
 }
-function renderPublicGrid(){
+// Welders of the active entity matching the search box + process + production-stage filters
+// (everything EXCEPT the status chip) -- the chip counts are computed from this, so they always
+// match what the search currently shows.
+function lookupBaseList(){
   const q = ($('#search-box').value||'').trim().toLowerCase();
-  const grid = $('#public-grid');
-  const list = weldersInActiveEntity().filter(w=>{
-    const st = welderOverallStatus(w);
-    if(lkStatus && st !== lkStatus) return false;
+  return weldersInActiveEntity().filter(w=>{
     if(lkProcess && !w.certificates.some(c=>(c.process||'').trim()===lkProcess)) return false;
     if(lkJoint && !w.certificates.some(c=>(c.joint||'').trim()===lkJoint)) return false;
     if(!q) return true;
     return w.idWelder.toLowerCase().includes(q) || (w.idEmployee||'').toLowerCase().includes(q) || w.name.toLowerCase().includes(q);
   });
+}
+// Welders with at least one certificate whose expiry date is empty (update13). This chip can
+// overlap the status chips (such a welder also has an overall status), so it is not part of
+// the "All = sum of chips" total.
+function hasUndatedCert(w){
+  return (w.certificates||[]).some(c=>!String(c.validDate||'').trim());
+}
+function renderStatusChips(){
+  const row = $('#status-chip-row');
+  if(!row) return;
+  const base = lookupBaseList();
+  const n = {ok:0, warn:0, bad:0, none:0};
+  base.forEach(w=>{ n[welderOverallStatus(w)]++; });
+  const nNoDate = base.filter(hasUndatedCert).length;
+  const chip = (st, cls, label, count)=>
+    `<button type="button" class="status-chip ${cls} ${lkStatus===st?'active':''}" data-status="${st}">${cls?'<span class="dot"></span>':''}${label} <span class="chip-count">(${count})</span></button>`;
+  row.innerHTML =
+    chip('', '', L.filterAllShort, base.length) +
+    chip('ok', 'st-ok', L.statusOk, n.ok) +
+    chip('warn', 'st-warn', L.statusWarn, n.warn) +
+    chip('bad', 'st-bad', L.statusBad, n.bad) +
+    chip('none', 'st-none', L.statusNone, n.none) +
+    chip('nodate', 'st-nodate', L.filterNoDate, nNoDate);
+  row.querySelectorAll('.status-chip').forEach(btn=>{
+    btn.onclick = ()=>{ lkStatus = btn.dataset.status; renderPublicGrid(); };
+  });
+}
+function renderPublicGrid(){
+  renderStatusChips();
+  const grid = $('#public-grid');
+  const list = lookupBaseList().filter(w=> !lkStatus || (lkStatus==='nodate' ? hasUndatedCert(w) : welderOverallStatus(w) === lkStatus));
   if(!list.length){
     grid.innerHTML = `<div class="muted" style="padding:20px">${L.noResults}</div>`;
     return;
@@ -822,7 +965,7 @@ function renderWelderPage(w){
   }catch(e){ /* CDN script not loaded -- page still works without the QR image */ }
   const certsHtml = w.certificates.length
     ? w.certificates.map(c=>{
-        const cst = certStatus(c.validDate);
+        const cst = certStatus(c.validDate, w.entity);
         const fields = [
           [L.fieldProcess, c.process], [L.fieldType, c.type],
           ['Base material', c.baseMaterial], ['Filler material', c.fillerMaterial],
@@ -911,7 +1054,7 @@ function renderAdmin(){
       btn.textContent = L.loginChecking;
       try{
         const acc = await tryLogin(u, p);
-        enterAdmin(acc);
+        await enterAdmin(acc);
       }catch(e){
         $('#login-err').textContent = L.loginError;
       }finally{
@@ -929,7 +1072,7 @@ function renderAdmin(){
   const processOptions = distinctProcesses();
   $('#admin-panel-view').innerHTML = `
     <div class="card row" style="justify-content:space-between">
-      <div><b>${esc(session.name)}</b> <span class="badge badge-${session.role==='superadmin'?'warn':session.role==='editor'?'ok':'none'}" style="margin-left:6px">${esc(roleLabel(session.role))}</span></div>
+      <div><b>${esc(session.name)}</b> <span class="badge badge-${session.role==='superadmin'?'warn':(session.role==='editor'||session.role==='entityadmin')?'ok':'none'}" style="margin-left:6px">${esc(roleLabel(session.role, session.entity))}</span></div>
       <button class="btn btn-sm" id="btn-logout">${L.logoutBtn}</button>
     </div>
 
@@ -937,25 +1080,36 @@ function renderAdmin(){
 
     ${session.role==='superadmin' ? `
     <div class="card">
-      <h2>${L.settingsTitle}</h2>
+      <h2>${L.settingsGlobalTitle}</h2>
       <div class="row" style="flex-direction:column;align-items:stretch;gap:10px">
         <label class="small muted">${L.settingsBaseUrl}
           <input type="text" id="set-baseurl" value="${esc(SETTINGS.baseUrl||'')}" placeholder="https://cswind.example.com">
         </label>
-        <label class="small muted">${L.settingsWarnDays}
-          <input type="number" id="set-warndays" value="${SETTINGS.warnDays||45}" min="1" style="max-width:120px">
-        </label>
-        <label class="small muted">${L.settingsEmails}
-          <input type="text" id="set-emails" value="${esc(SETTINGS.emails||'')}" placeholder="a@cswind.vn, b@cswind.vn">
-        </label>
-        <button class="btn btn-primary write-action" id="btn-save-settings" style="align-self:flex-start">${L.settingsSave}</button>
+        <button class="btn btn-primary" id="btn-save-settings" style="align-self:flex-start">${L.settingsSave}</button>
       </div>
     </div>` : ''}
 
-    ${session.role==='superadmin' ? renderAccountsCardHtml() : ''}
+    ${canManageEntitySettings(activeEntity) ? `
+    <div class="card">
+      <h2>${esc(L.entitySettingsTitle(entityLabel(activeEntity)))}</h2>
+      <div class="small muted" style="margin-bottom:10px">${L.entitySettingsHint}</div>
+      <div class="row" style="flex-direction:column;align-items:stretch;gap:10px">
+        <label class="small muted">${L.settingsWarnDays}
+          <input type="number" id="ent-warndays" value="${warnDaysFor(activeEntity)}" min="1" max="3650" style="max-width:120px">
+        </label>
+        <label class="small muted">${L.settingsEmails}
+          <input type="text" id="ent-emails" value="${esc(activeEntityObj().emails||'')}" placeholder="a@cswind.vn, b@cswind.vn">
+        </label>
+        <button class="btn btn-primary" id="btn-save-entity-settings" style="align-self:flex-start">${L.settingsSave}</button>
+        <div class="small" id="ent-settings-err" style="color:var(--bad)"></div>
+      </div>
+    </div>` : ''}
+
+    ${canManageAccounts() ? renderAccountsCardHtml() : ''}
 
     <div class="card">
-      <h2>${L.reminderExpiringTitle}</h2>
+      <h2 id="expiring-title">${L.reminderExpiringTitle}</h2>
+      <div class="stat" id="expiring-stats"></div>
       <div id="expiring-table-wrap"></div>
       <h2 style="margin-top:18px">${L.reminderTitle}</h2>
       <div id="reminder-recipients-line" class="small muted" style="margin-bottom:8px"></div>
@@ -964,7 +1118,7 @@ function renderAdmin(){
         <button class="btn btn-primary" id="btn-compose-email">${L.reminderComposeBtn}</button>
         ${session.role==='superadmin' ? `<button class="btn write-action" id="btn-send-reminder-now">${L.reminderSendNowBtn}</button>` : ''}
       </div>
-      ${session.role==='superadmin' ? `<div class="small muted" id="reminder-auto-status" style="margin-top:8px">…</div>` : ''}
+      ${(session.role==='superadmin' || canManageEntitySettings(activeEntity)) ? `<div class="small muted" id="reminder-auto-status" style="margin-top:8px">…</div>` : ''}
     </div>
 
     <div class="card">
@@ -998,16 +1152,15 @@ function renderAdmin(){
   `;
   $('#btn-logout').onclick = logoutAdmin;
   wireEntityBar('entity-bar-admin', { allowDelete: true });
-  if(session.role==='superadmin'){
+  if(canManageAccounts()){
     loadAccountsAndRender();
     $('#btn-create-account').onclick = createAccount;
+    if($('#acc-new-role')) $('#acc-new-role').onchange = syncNewAccountEntityField;
+    syncNewAccountEntityField();
   }
+  if($('#btn-save-entity-settings')) $('#btn-save-entity-settings').onclick = saveEntitySettings;
   if($('#btn-save-settings')) $('#btn-save-settings').onclick = async ()=>{
-    const payload = {
-      baseUrl: $('#set-baseurl').value.trim(),
-      warnDays: parseInt($('#set-warndays').value,10) || 45,
-      emails: $('#set-emails').value.trim(),
-    };
+    const payload = { baseUrl: $('#set-baseurl').value.trim() };
     try{
       await apiFetch('PUT', '/api/settings', payload);
       SETTINGS = Object.assign({}, SETTINGS, payload);
@@ -1068,11 +1221,27 @@ function distinctProcesses(){
    Server-enforced (requireRole('superadmin') on every /api/accounts route) -- this UI is
    only ever rendered for a superadmin session, but the server would refuse it anyway. */
 function renderAccountsCardHtml(){
+  const isSuper = session.role==='superadmin';
+  const ownLabel = session.entity ? entityLabel(session.entity) : '';
+  const roleOptions = isSuper
+    ? `<option value="editor" selected>${L.roleEditor} (${L.accountsRoleEditorHint})</option>
+       <option value="viewer">${L.roleViewer}</option>
+       <option value="entityadmin">${L.roleEntityAdmin}</option>
+       <option value="superadmin">${L.roleSuperadmin}</option>`
+    : `<option value="editor" selected>${L.roleEditor} (${L.accountsRoleEditorHint})</option>
+       <option value="viewer">${L.roleViewer}</option>`;
+  const entityField = isSuper
+    ? `<div class="field" id="acc-new-entity-wrap"><label>${L.accountsEntity}</label>
+        <select id="acc-new-entity">
+          <option value="">${L.accountsEntityAll}</option>
+          ${ENTITIES.map(e=>`<option value="${esc(e.code)}">${esc(e.label)} (${esc(e.code)})</option>`).join('')}
+        </select></div>`
+    : `<div class="small muted" style="margin:4px 0 10px">${esc(L.accountsScopeNoteEntity(ownLabel))}</div>`;
   return `
     <div class="card">
       <div class="row" style="justify-content:space-between;align-items:flex-start">
         <h2>${L.accountsTitle}</h2>
-        <span class="small muted">${L.accountsSuperOnlyNote}</span>
+        <span class="small muted">${esc(isSuper ? L.accountsSuperOnlyNote : L.accountsEntityAdminNote(ownLabel))}</span>
       </div>
       <div id="accounts-list" class="small muted">…</div>
       <div class="subtle-card">
@@ -1082,16 +1251,24 @@ function renderAccountsCardHtml(){
           <div class="field"><label>${L.accountsTempPin}</label><input type="text" id="acc-new-pin"></div>
         </div>
         <div class="field"><label>${L.accountsRole}</label>
-          <select id="acc-new-role">
-            <option value="editor" selected>${L.roleEditor} (${L.accountsRoleEditorHint})</option>
-            <option value="viewer">${L.roleViewer}</option>
-            <option value="superadmin">${L.roleSuperadmin}</option>
-          </select>
+          <select id="acc-new-role">${roleOptions}</select>
         </div>
-        <button class="btn btn-primary write-action" id="btn-create-account">${L.accountsCreateBtn}</button>
+        ${entityField}
+        <button class="btn btn-primary" id="btn-create-account">${L.accountsCreateBtn}</button>
         <div class="small muted" id="acc-err" style="margin-top:8px;color:var(--bad)"></div>
       </div>
     </div>`;
+}
+// Superadmin form: the Entity field is required for an Entity admin, optional ("All
+// entities") for Admin / View only, and meaningless for a Super admin (always global).
+function syncNewAccountEntityField(){
+  const roleSel = $('#acc-new-role'), wrap = $('#acc-new-entity-wrap'), entSel = $('#acc-new-entity');
+  if(!roleSel || !wrap || !entSel) return;
+  const role = roleSel.value;
+  wrap.style.display = role==='superadmin' ? 'none' : '';
+  const allOpt = entSel.querySelector('option[value=""]');
+  if(allOpt) allOpt.disabled = role==='entityadmin';
+  if(role==='entityadmin' && !entSel.value) entSel.value = activeEntity;
 }
 async function loadAccountsAndRender(){
   try{
@@ -1105,49 +1282,64 @@ async function loadAccountsAndRender(){
 function renderAccountsList(){
   const el = $('#accounts-list');
   if(!el) return;
-  el.innerHTML = ACCOUNTS.map(a=>`
+  const isSuper = session && session.role==='superadmin';
+  const roleName = r=>({viewer:L.roleViewer, editor:L.roleEditor, entityadmin:L.roleEntityAdmin, superadmin:L.roleSuperadmin}[r] || r);
+  const roleOpts = cur=> (isSuper ? ['viewer','editor','entityadmin','superadmin'] : ['viewer','editor'])
+    .map(r=>`<option value="${r}" ${cur===r?'selected':''}>${esc(roleName(r))}</option>`).join('');
+  const entOpts = cur=> `<option value="" ${!cur?'selected':''}>${L.accountsEntityAll}</option>` +
+    ENTITIES.map(e=>`<option value="${esc(e.code)}" ${cur===e.code?'selected':''}>${esc(e.code)}</option>`).join('');
+  el.innerHTML = ACCOUNTS.length ? ACCOUNTS.map(a=>`
     <div class="acc-row">
-      <div>${esc(a.username)} <span class="badge badge-none" style="margin-left:6px">${esc(roleLabel(a.role))}</span></div>
+      <div>${esc(a.username)} <span class="badge badge-none" style="margin-left:6px">${esc(roleLabel(a.role, a.entity))}</span></div>
       <div class="row">
-        <select class="btn-sm" data-role-select="${a.id}" style="width:auto">
-          <option value="viewer" ${a.role==='viewer'?'selected':''}>${L.roleViewer}</option>
-          <option value="editor" ${a.role==='editor'?'selected':''}>${L.roleEditor}</option>
-          <option value="superadmin" ${a.role==='superadmin'?'selected':''}>${L.roleSuperadmin}</option>
-        </select>
-        <button class="btn btn-sm write-action" data-reset-pin="${a.id}" data-reset-name="${esc(a.username)}">${L.accountsResetPin}</button>
-        <button class="btn btn-sm btn-danger write-action" data-del-account="${a.id}" data-del-name="${esc(a.username)}">${L.accountsDeleteBtn}</button>
+        <select class="btn-sm" data-role-select="${a.id}" style="width:auto">${roleOpts(a.role)}</select>
+        ${isSuper ? `<select class="btn-sm" data-entity-select="${a.id}" style="width:auto;${a.role==='superadmin'?'display:none':''}">${entOpts(a.entity)}</select>` : ''}
+        <button class="btn btn-sm" data-reset-pin="${a.id}" data-reset-name="${esc(a.username)}">${L.accountsResetPin}</button>
+        <button class="btn btn-sm btn-danger" data-del-account="${a.id}" data-del-name="${esc(a.username)}">${L.accountsDeleteBtn}</button>
       </div>
     </div>
-  `).join('');
-  $all('[data-role-select]').forEach(sel=>{
-    sel.onchange = async ()=>{
-      const id = sel.dataset.roleSelect;
-      try{
-        await apiFetch('PUT', '/api/accounts/'+id+'/role', { role: sel.value });
-        const acc = ACCOUNTS.find(a=>String(a.id)===String(id));
-        toast(L.accountsRoleChangedToast(acc ? acc.username : ''));
-        await loadAccountsAndRender();
-      }catch(e){ if(!handleWriteError(e)) toast(L.loadError); }
-    };
-  });
+  `).join('') : `<div class="muted small">—</div>`;
+  const saveRole = async (id)=>{
+    const roleSel = el.querySelector(`[data-role-select="${id}"]`);
+    const entSel = el.querySelector(`[data-entity-select="${id}"]`);
+    const body = { role: roleSel.value };
+    if(entSel){
+      body.entity = roleSel.value==='superadmin' ? null : (entSel.value || null);
+      if(body.role==='entityadmin' && !body.entity){ entSel.value = activeEntity; body.entity = activeEntity; }
+    }
+    try{
+      await apiFetch('PUT', '/api/accounts/'+id+'/role', body);
+      const acc = ACCOUNTS.find(a=>String(a.id)===String(id));
+      toast(L.accountsRoleChangedToast(acc ? acc.username : ''));
+    }catch(e){
+      if(handleWriteError(e)) return;
+      if(e.data && e.data.error==='last_superadmin') toast(L.accountsLastSuperadmin);
+      else if(e.data && e.data.error==='entity_required') toast(L.accountsEntityRequired);
+      else toast(L.loadError);
+    }
+    await loadAccountsAndRender();
+  };
+  $all('[data-role-select]').forEach(sel=>{ sel.onchange = ()=> saveRole(sel.dataset.roleSelect); });
+  $all('[data-entity-select]').forEach(sel=>{ sel.onchange = ()=> saveRole(sel.dataset.entitySelect); });
   $all('[data-reset-pin]').forEach(btn=>{
     btn.onclick = ()=> resetAccountPassword(btn.dataset.resetPin, btn.dataset.resetName);
   });
   $all('[data-del-account]').forEach(btn=>{
     btn.onclick = ()=> deleteAccount(btn.dataset.delAccount, btn.dataset.delName);
   });
-  applyReadOnlyUi();
 }
 async function createAccount(){
   const name = $('#acc-new-name').value.trim();
   const pin = $('#acc-new-pin').value.trim();
   const role = $('#acc-new-role').value;
+  const entity = $('#acc-new-entity') ? ($('#acc-new-entity').value || null) : null;
   const errEl = $('#acc-err');
   errEl.textContent = '';
   if(!name){ errEl.textContent = L.accountsNameRequired; return; }
   if(!pin || pin.length < 4){ errEl.textContent = L.accountsPinTooShort; return; }
+  if(role==='entityadmin' && !entity){ errEl.textContent = L.accountsEntityRequired; return; }
   try{
-    await apiFetch('POST', '/api/accounts', { username: name, password: pin, role });
+    await apiFetch('POST', '/api/accounts', { username: name, password: pin, role, entity: role==='superadmin' ? null : entity });
     $('#acc-new-name').value = ''; $('#acc-new-pin').value = '';
     toast(L.accountsCreatedToast(name));
     await loadAccountsAndRender();
@@ -1155,6 +1347,7 @@ async function createAccount(){
     if(handleWriteError(e)) return;
     if(e.status===409 || (e.data && e.data.error==='already_exists')) errEl.textContent = L.accountsNameExists;
     else if(e.data && e.data.error==='password_too_short') errEl.textContent = L.accountsPinTooShort;
+    else if(e.data && e.data.error==='entity_required') errEl.textContent = L.accountsEntityRequired;
     else errEl.textContent = L.loadError;
   }
 }
@@ -1195,12 +1388,37 @@ async function deleteAccount(id, name){
   }
 }
 
+/* ================= PER-ENTITY SETTINGS (update9) ================= */
+async function saveEntitySettings(){
+  const code = activeEntity;
+  const errEl = $('#ent-settings-err');
+  if(errEl) errEl.textContent = '';
+  const warnDays = parseInt($('#ent-warndays').value, 10);
+  if(!Number.isFinite(warnDays) || warnDays < 1 || warnDays > 3650){ if(errEl) errEl.textContent = L.entitySettingsInvalidDays; return; }
+  const emails = $('#ent-emails').value.trim();
+  try{
+    await apiFetch('PUT', '/api/entities/'+encodeURIComponent(code)+'/settings', { warnDays, emails });
+    await loadEntities();
+    activeEntity = code;
+    toast(L.entitySettingsSaved);
+    renderAll();
+  }catch(e){
+    if(handleWriteError(e)) return;
+    if(e.data && e.data.error==='invalid_email'){ if(errEl) errEl.textContent = L.entitySettingsInvalidEmail((e.data.emails||[]).join(', ')); }
+    else if(e.data && e.data.error==='invalid_warn_days'){ if(errEl) errEl.textContent = L.entitySettingsInvalidDays; }
+    else toast(L.loadError);
+  }
+}
+
 /* ================= REMINDER EMAIL / EXPIRING REPORT ================= */
+function activeEntityEmails(){
+  return (activeEntityObj().emails||'').split(/[,;\s]+/).map(s=>s.trim()).filter(Boolean);
+}
 function renderReminderPanel(){
-  const emails = (SETTINGS.emails||'').split(',').map(s=>s.trim()).filter(Boolean);
-  $('#reminder-recipients-line').innerHTML = emails.length
+  const emails = activeEntityEmails();
+  $('#reminder-recipients-line').innerHTML = `<div style="margin-bottom:4px">${esc(L.reminderEntityNote(entityLabel(activeEntity)))}</div>` + (emails.length
     ? L.reminderWillSendTo + ' ' + emails.map(e=>`<span class="chip">${esc(e)}</span>`).join('')
-    : L.reminderNoEmails;
+    : L.reminderNoEmails);
   const list = expiringList();
   $('#reminder-preview').innerHTML = list.length
     ? L.reminderPreviewCount(list.length)
@@ -1210,7 +1428,7 @@ function expiringList(){
   const out = [];
   weldersInActiveEntity().forEach(w=>{
     w.certificates.forEach(c=>{
-      const st = certStatus(c.validDate);
+      const st = certStatus(c.validDate, w.entity);
       if(st==='warn' || st==='bad'){
         out.push({idWelder:w.idWelder, name:w.name, process:c.process, validDate:c.validDate, status:st});
       }
@@ -1223,16 +1441,27 @@ function renderExpiringTable(){
   const el = $('#expiring-table-wrap');
   if(!el) return;
   const list = expiringList();
+  // Counts shown in the heading + summary boxes (always for the currently selected entity).
+  const nWarn = list.filter(x=>x.status==='warn').length;
+  const nBad = list.filter(x=>x.status==='bad').length;
+  const peopleAll = new Set(list.map(x=>x.idWelder)).size;
+  const peopleWarn = new Set(list.filter(x=>x.status==='warn').map(x=>x.idWelder)).size;
+  if($('#expiring-title')) $('#expiring-title').textContent = L.reminderExpiringTitleCounts(nWarn, nBad, list.length);
+  if($('#expiring-stats')) $('#expiring-stats').innerHTML = `
+    <div class="box"><div class="n">${list.length}</div><div class="l">${L.expStatCerts}</div></div>
+    <div class="box"><div class="n" style="color:var(--bad)">${peopleAll}</div><div class="l">${L.expStatPeopleRenew}</div></div>
+    <div class="box"><div class="n" style="color:var(--warn)">${peopleWarn}</div><div class="l">${L.expStatPeopleWarn}</div></div>`;
   if(!list.length){
     el.innerHTML = `<div class="muted small" style="padding:6px 0 12px">${L.reminderPreviewNone}</div>`;
     return;
   }
   const today = new Date(todayISO());
-  const rows = list.map(x=>{
+  const rows = list.map((x,i)=>{
     const vd = new Date(x.validDate);
     const diffDays = Math.round((vd - today) / 86400000);
     const remain = diffDays >= 0 ? L.daysRemaining(diffDays) : L.daysOverdue(Math.abs(diffDays));
     return `<tr>
+      <td>${i+1}</td>
       <td>${esc(x.name)}</td>
       <td>${esc(x.idWelder)}</td>
       <td>${esc(x.process||'—')}</td>
@@ -1241,8 +1470,8 @@ function renderExpiringTable(){
       <td>${statusBadge(x.status)}</td>
     </tr>`;
   }).join('');
-  el.innerHTML = `<div style="overflow-x:auto"><table>
-    <thead><tr><th>${L.colName}</th><th>${L.colCode}</th><th>${L.colProcess}</th><th>${L.colValidUntil}</th><th>${L.colRemaining}</th><th>${L.colStatusShort}</th></tr></thead>
+  el.innerHTML = `<div style="overflow-x:auto"><table style="white-space:nowrap">
+    <thead><tr><th style="width:48px">${L.colNo}</th><th>${L.colName}</th><th>${L.colCode}</th><th>${L.colProcess}</th><th>${L.colValidUntil}</th><th>${L.colRemaining}</th><th>${L.colStatusShort}</th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
 }
@@ -1255,14 +1484,14 @@ function openMailto(mailtoHref){
   document.body.removeChild(a);
 }
 function composeReminderEmail(){
-  const emails = (SETTINGS.emails||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const emails = activeEntityEmails();
   if(!emails.length){ toast(L.reminderNoEmailsToast); return; }
-  const fullList = expiringList(); // already sorted soonest-expiry first
-  const subject = `[CSWIND] Danh sách thợ hàn cần gia hạn / tái đánh giá — ${fmtDate(todayISO())}`;
+  const fullList = expiringList(); // already sorted soonest-expiry first (active entity only)
+  const subject = `[CSWIND][${activeEntity}] Danh sách thợ hàn cần gia hạn / tái đánh giá (${fullList.length}) — ${fmtDate(todayISO())}`;
   const introLine = "Dear Sir/ Madam: please check the list of welders/ welding operator that need extend valid date or re-qualification.";
   const listHeading = "Danh sách / List:";
   const closingLine = "Đề nghị gia hạn hoặc tái đánh giá tay nghề trước ngày hết hạn. / Please renew or re-qualify before the expiry date.";
-  const signOff = "Trân trọng / Regards,\nCSWIND Việt Nam";
+  const signOff = "Trân trọng / Regards,\nCSWIND — " + entityLabel(activeEntity);
   const noDataLine = "(Không có chứng chỉ nào sắp/đã hết hạn. / None currently expiring or expired.)";
   function bodyFor(shownCount){
     const items = fullList.slice(0, shownCount);
@@ -1296,7 +1525,20 @@ async function refreshReminderAutoStatus(){
   if(!el) return;
   try{
     const s = await apiFetch('GET', '/api/reminders/status');
-    el.textContent = s.configured ? L.reminderAutoConfigured : L.reminderAutoNotConfigured;
+    // "Send test now" goes through the server's own SMTP -- only meaningful when that is
+    // configured (paid Render plan). In Gmail/Apps Script mode, testing is done from the
+    // script's "Run" button instead, so hide the button rather than let it error.
+    const btn = $('#btn-send-reminder-now');
+    if(btn) btn.style.display = s.configured ? '' : 'none';
+    const head = s.configured ? L.reminderAutoConfigured : s.gmailReady ? L.reminderAutoGmail : L.reminderAutoNotConfigured;
+    let lastLine = '';
+    const lastEnt = activeEntityObj().lastReminder;
+    if(lastEnt && lastEnt.at){
+      lastLine = L.reminderLastSent(fmtDateTime(new Date(lastEnt.at)), lastEnt.count==null ? '?' : lastEnt.count, lastEnt.to || '');
+    }else if(s.configured || s.gmailReady){
+      lastLine = L.reminderLastNone;
+    }
+    el.innerHTML = esc(head) + (lastLine ? '<br>' + esc(lastLine) : '');
   }catch(e){ el.textContent = ''; }
 }
 async function sendReminderNow(){
@@ -1421,9 +1663,9 @@ function openWelderForm(idWelder){
     <div class="field"><label>${L.fieldCode}</label><input type="text" id="wf-code" value="${esc(w?w.idWelder:'')}" ${w?'disabled':''} placeholder="CS4000"></div>
     <div class="field"><label>${L.fieldName}</label><input type="text" id="wf-name" value="${esc(w?w.name:'')}"></div>
     <div class="field"><label>${L.fieldEmployeeId}</label><input type="text" id="wf-empid" value="${esc(w?w.idEmployee||'':'')}"></div>
-    <div class="field"><label>${L.fieldCompany}</label><input type="text" id="wf-company" value="${esc(w?w.company||'CSWIND Việt Nam':'CSWIND Việt Nam')}"></div>
+    <div class="field"><label>${L.fieldCompany}</label><input type="text" id="wf-company" value="${esc(w ? (w.company||defaultCompanyFor(w.entity)) : defaultCompanyFor(activeEntity))}"></div>
     <div class="field"><label>${L.fieldEntity}</label>
-      <select id="wf-entity">${ENTITIES.map(e=>`<option value="${esc(e.code)}" ${(w?w.entity:activeEntity)===e.code?'selected':''}>${esc(e.label)}</option>`).join('')}</select>
+      <select id="wf-entity">${ENTITIES.filter(e=>canWriteEntity(e.code)).map(e=>`<option value="${esc(e.code)}" ${(w?w.entity:activeEntity)===e.code?'selected':''}>${esc(e.label)}</option>`).join('')}</select>
     </div>
     <div class="field">
       <label>${L.fieldPhoto}</label>
@@ -1665,7 +1907,7 @@ async function runImport(){
         idWelder,
         name: (row[colIdx.name]||'').toString().trim(),
         idEmployee: colIdx.idEmployee!=null && row[colIdx.idEmployee]!=null ? String(row[colIdx.idEmployee]).trim() : '',
-        company: 'CSWIND Việt Nam',
+        company: defaultCompanyFor(activeEntity),
         certificates: [],
       };
     }
@@ -1681,10 +1923,13 @@ async function runImport(){
   const importedIds = Object.keys(byId);
   if(!importedIds.length){ statusEl.textContent = L.importNoRows; return; }
 
-  let added = 0, updated = 0, failed = 0;
+  let added = 0, updated = 0, failed = 0, skippedOther = 0;
   for(const idWelder of importedIds){
     const incoming = byId[idWelder];
     const existing = WELDERS.find(w=>w.idWelder===idWelder);
+    // Entity-scoped accounts can't touch welders that live in another entity -- skip them
+    // instead of hitting a 403 (which would flip the whole page to read-only).
+    if(existing && !canWriteEntity(existing.entity||'CSW-VN')){ skippedOther++; continue; }
     // preserve original-cert-image attachments where process+validDate still match
     if(existing){
       incoming.certificates.forEach(c=>{
@@ -1716,7 +1961,7 @@ async function runImport(){
   }
 
   await loadWelders();
-  statusEl.textContent = L.importResult(added, updated) + (failed ? ` (${failed} lỗi/failed)` : '');
+  statusEl.textContent = L.importResult(added, updated) + (failed ? ` (${failed} lỗi/failed)` : '') + (skippedOther ? ` — ${L.importSkippedOtherEntity(skippedOther)}` : '');
   toast(L.importResult(added, updated));
   renderAll();
 }
@@ -1730,7 +1975,10 @@ function bindStaticEvents(){
     };
   });
   $('#search-box').oninput = renderPublicGrid;
+  const pageMax = ()=> Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
   if($('#back-to-top')) $('#back-to-top').onclick = ()=> window.scrollTo({top:0, behavior:'smooth'});
+  if($('#scroll-mid')) $('#scroll-mid').onclick = ()=> window.scrollTo({top:Math.round(pageMax()/2), behavior:'smooth'});
+  if($('#scroll-bottom')) $('#scroll-bottom').onclick = ()=> window.scrollTo({top:pageMax(), behavior:'smooth'});
   $all('.lang-btn').forEach(btn=>{
     btn.onclick = ()=> setLang(btn.dataset.lang);
   });
@@ -1807,6 +2055,7 @@ function activateTab(tab){
   $('#tab-admin').style.display = tab==='admin' ? 'block' : 'none';
 }
 function renderAll(){
+  renderPublicInfoBanner();
   wireEntityBar('entity-bar-lookup');
   renderStats();
   renderLookupFilterBar();
