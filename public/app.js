@@ -206,7 +206,7 @@ const L_VI = {
   filterAll: 'Tất cả trạng thái',
   statusOk: 'Còn hạn', statusWarn: 'Sắp hết hạn', statusBad: 'Hết hạn', statusNone: 'Chưa có chứng chỉ',
   statTotal: 'Tổng số thợ hàn', statOk: 'Còn hạn', statWarn: 'Sắp hết hạn', statBad: 'Hết hạn',
-  statCertTotal: 'Tổng số chứng chỉ', statCertOk: 'Chứng chỉ còn hạn', statCertWarn: 'Chứng chỉ sắp hết hạn', statCertBad: 'Chứng chỉ đã hết hạn', statNoCert: 'Số người không có chứng chỉ', statCertNoDate: 'Chứng chỉ chưa có ngày hết hạn',
+  statCertTotal: 'Tổng số chứng chỉ', statCertOk: 'Chứng chỉ còn hạn', statCertWarn: 'Chứng chỉ sắp hết hạn', statCertBad: 'Chứng chỉ đã hết hạn', statNoCert: 'Số người không có chứng chỉ', statCertNoDate: 'Chứng chỉ chưa có ngày hết hạn', filterNoDate: 'Chứng chỉ chưa có ngày hết hạn',
   scrollMidLabel: 'Đến giữa trang', scrollBottomLabel: 'Xuống cuối trang',
   certsSuffix: 'chứng chỉ',
   noResults: 'Không tìm thấy thợ hàn phù hợp.',
@@ -341,7 +341,7 @@ const L_EN = {
   filterAll: 'All statuses',
   statusOk: 'Valid', statusWarn: 'Expiring soon', statusBad: 'Expired', statusNone: 'No certificates',
   statTotal: 'Total welders', statOk: 'Valid', statWarn: 'Expiring soon', statBad: 'Expired',
-  statCertTotal: 'Total certificates', statCertOk: 'Valid certificates', statCertWarn: 'Certificates expiring soon', statCertBad: 'Expired certificates', statNoCert: 'People without certificates', statCertNoDate: 'Certificates without an expiry date',
+  statCertTotal: 'Total certificates', statCertOk: 'Valid certificates', statCertWarn: 'Certificates expiring soon', statCertBad: 'Expired certificates', statNoCert: 'People without certificates', statCertNoDate: 'Certificates without an expiry date', filterNoDate: 'No expiry date',
   scrollMidLabel: 'Go to middle of page', scrollBottomLabel: 'Go to bottom of page',
   certsSuffix: 'certificates',
   noResults: 'No matching welders found.',
@@ -861,12 +861,19 @@ function lookupBaseList(){
     return w.idWelder.toLowerCase().includes(q) || (w.idEmployee||'').toLowerCase().includes(q) || w.name.toLowerCase().includes(q);
   });
 }
+// Welders with at least one certificate whose expiry date is empty (update13). This chip can
+// overlap the status chips (such a welder also has an overall status), so it is not part of
+// the "All = sum of chips" total.
+function hasUndatedCert(w){
+  return (w.certificates||[]).some(c=>!String(c.validDate||'').trim());
+}
 function renderStatusChips(){
   const row = $('#status-chip-row');
   if(!row) return;
   const base = lookupBaseList();
   const n = {ok:0, warn:0, bad:0, none:0};
   base.forEach(w=>{ n[welderOverallStatus(w)]++; });
+  const nNoDate = base.filter(hasUndatedCert).length;
   const chip = (st, cls, label, count)=>
     `<button type="button" class="status-chip ${cls} ${lkStatus===st?'active':''}" data-status="${st}">${cls?'<span class="dot"></span>':''}${label} <span class="chip-count">(${count})</span></button>`;
   row.innerHTML =
@@ -874,7 +881,8 @@ function renderStatusChips(){
     chip('ok', 'st-ok', L.statusOk, n.ok) +
     chip('warn', 'st-warn', L.statusWarn, n.warn) +
     chip('bad', 'st-bad', L.statusBad, n.bad) +
-    (n.none || lkStatus==='none' ? chip('none', 'st-none', L.statusNone, n.none) : '');
+    chip('none', 'st-none', L.statusNone, n.none) +
+    chip('nodate', 'st-nodate', L.filterNoDate, nNoDate);
   row.querySelectorAll('.status-chip').forEach(btn=>{
     btn.onclick = ()=>{ lkStatus = btn.dataset.status; renderPublicGrid(); };
   });
@@ -882,7 +890,7 @@ function renderStatusChips(){
 function renderPublicGrid(){
   renderStatusChips();
   const grid = $('#public-grid');
-  const list = lookupBaseList().filter(w=> !lkStatus || welderOverallStatus(w) === lkStatus);
+  const list = lookupBaseList().filter(w=> !lkStatus || (lkStatus==='nodate' ? hasUndatedCert(w) : welderOverallStatus(w) === lkStatus));
   if(!list.length){
     grid.innerHTML = `<div class="muted" style="padding:20px">${L.noResults}</div>`;
     return;
@@ -1117,11 +1125,13 @@ function renderAdmin(){
       <h2>${L.masterListTitle(weldersInActiveEntity().length)}</h2>
       <div class="row" style="margin-bottom:10px">
         <input type="text" id="admin-search" placeholder="${L.masterSearchPlaceholder}" style="max-width:240px">
-        <select id="admin-filter-status" style="max-width:180px">
+        <select id="admin-filter-status" style="max-width:280px">
           <option value="">${L.filterAll}</option>
           <option value="ok">${L.statusOk}</option>
           <option value="warn">${L.statusWarn}</option>
           <option value="bad">${L.statusBad}</option>
+          <option value="none">${L.statusNone}</option>
+          <option value="nodate">${L.filterNoDate}</option>
         </select>
         <select id="admin-filter-process" style="max-width:200px">
           <option value="">${L.filterProcessAll}</option>
@@ -1563,12 +1573,23 @@ function renderAdminTable(){
   const q = ($('#admin-search') && $('#admin-search').value || '').trim().toLowerCase();
   const filterSt = ($('#admin-filter-status') && $('#admin-filter-status').value) || '';
   const filterProc = ($('#admin-filter-process') && $('#admin-filter-process').value) || '';
-  const list = weldersInActiveEntity().filter(w=>{
-    if(filterSt && welderOverallStatus(w) !== filterSt) return false;
+  // Same six filters as the Lookup tab (update14), with live counts in the dropdown that
+  // follow the search box + process filter -- handy to find records someone forgot to finish
+  // (no certificate yet, or a certificate saved without an expiry date).
+  const base = weldersInActiveEntity().filter(w=>{
     if(filterProc && !w.certificates.some(c=>(c.process||'').trim()===filterProc)) return false;
     if(!q) return true;
     return w.idWelder.toLowerCase().includes(q) || w.name.toLowerCase().includes(q);
   });
+  const sel = $('#admin-filter-status');
+  if(sel){
+    const n = {ok:0, warn:0, bad:0, none:0};
+    base.forEach(w=>{ n[welderOverallStatus(w)]++; });
+    const counts = {'':base.length, ok:n.ok, warn:n.warn, bad:n.bad, none:n.none, nodate:base.filter(hasUndatedCert).length};
+    const labels = {'':L.filterAll, ok:L.statusOk, warn:L.statusWarn, bad:L.statusBad, none:L.statusNone, nodate:L.filterNoDate};
+    Array.from(sel.options).forEach(o=>{ o.textContent = `${labels[o.value]} (${counts[o.value]})`; });
+  }
+  const list = base.filter(w=> !filterSt || (filterSt==='nodate' ? hasUndatedCert(w) : welderOverallStatus(w) === filterSt));
   const statusRank = {ok:0, warn:1, bad:2, none:3};
   list.sort((a,b)=>{
     let cmp;
