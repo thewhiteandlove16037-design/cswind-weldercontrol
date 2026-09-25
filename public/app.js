@@ -200,7 +200,7 @@ function handleWriteError(err){
 
 /* ================= LANGUAGE ================= */
 const L_VI = {
-  appTitle: 'CSWIND QR-ID Thợ hàn',
+  appTitle: 'CS Wind Welder Certification Control',
   tabLookup: 'Tra cứu', tabAdmin: 'Quản trị',
   searchPlaceholder: 'Tìm theo mã thợ hàn, mã nhân viên hoặc họ tên…',
   filterAll: 'Tất cả trạng thái',
@@ -265,12 +265,12 @@ const L_VI = {
   importResult: (added,updated)=>`Đã thêm ${added} thợ hàn mới, cập nhật ${updated} thợ hàn đã có.`,
   importNoRows: 'Không đọc được dòng dữ liệu nào phù hợp trong file — kiểm tra lại định dạng cột.',
   importParsing: 'Đang đọc file…',
-  qrInfoHeader: 'CSWIND — QR-ID Thợ hàn', qrInfoNameLabel: 'Họ tên', qrInfoCodeLabel: 'Mã', qrInfoEmpIdLabel: 'Mã NV',
+  qrInfoHeader: 'CS Wind Welder Certification Control', qrInfoNameLabel: 'Họ tên', qrInfoCodeLabel: 'Mã', qrInfoEmpIdLabel: 'Mã NV',
   qrInfoCompanyLabel: 'Công ty', qrInfoStatusLabel: 'Trạng thái', qrInfoCertsHeading: 'Chứng chỉ:',
   qrInfoValidDateLabel: 'Ngày hết hạn', qrInfoMoreLabel: 'Xem đầy đủ', qrInfoNoCerts: 'Chưa có chứng chỉ được ghi nhận.',
   qrInfoUpdatedLabel: 'Cập nhật hồ sơ', profileUpdatedLabel: 'Cập nhật hồ sơ',
   filterSegmentAll: 'Tất cả công đoạn SX', filterAllShort: 'Tất cả',
-  publicInfoBanner: 'Trang tra cứu công khai của CSWIND Việt Nam — ai có link cũng xem được, không cần tài khoản. Nhân viên có tài khoản đăng nhập ở tab Quản trị để thêm/sửa dữ liệu, xem báo cáo sắp hết hạn và in mã QR.',
+  publicInfoBanner: label=>`Trang tra cứu công khai của ${label} — ai có link cũng xem được, không cần tài khoản. Nhân viên có tài khoản đăng nhập ở tab Quản trị để thêm/sửa dữ liệu, xem báo cáo sắp hết hạn và in mã QR.`,
   accountsTitle: 'Quản lý tài khoản quản trị', accountsSuperOnlyNote: 'Quản trị cấp cao thấy và quản lý mọi tài khoản',
   accountsGrantTitle: 'Cấp tài khoản quản trị mới', accountsDisplayName: 'Tên đăng nhập', accountsTempPin: 'Mật khẩu tạm thời',
   accountsRole: 'Cấp quyền', accountsRoleEditorHint: 'thêm/sửa dữ liệu', accountsCreateBtn: 'Tạo tài khoản', accountsResetPin: 'Đặt lại mật khẩu',
@@ -333,7 +333,7 @@ const L_VI = {
   entityLastError: 'Không thể xoá — đây là entity duy nhất còn lại.',
 };
 const L_EN = {
-  appTitle: 'CSWIND QR-ID Welder',
+  appTitle: 'CS Wind Welder Certification Control',
   tabLookup: 'Lookup', tabAdmin: 'Admin',
   searchPlaceholder: 'Search by welder ID, employee ID or name…',
   filterAll: 'All statuses',
@@ -398,12 +398,12 @@ const L_EN = {
   importResult: (added,updated)=>`Added ${added} new welder(s), updated ${updated} existing welder(s).`,
   importNoRows: 'No matching data rows could be read from this file — check the column format.',
   importParsing: 'Reading file…',
-  qrInfoHeader: 'CSWIND — QR-ID Welder', qrInfoNameLabel: 'Name', qrInfoCodeLabel: 'ID', qrInfoEmpIdLabel: 'Employee ID',
+  qrInfoHeader: 'CS Wind Welder Certification Control', qrInfoNameLabel: 'Name', qrInfoCodeLabel: 'ID', qrInfoEmpIdLabel: 'Employee ID',
   qrInfoCompanyLabel: 'Company', qrInfoStatusLabel: 'Status', qrInfoCertsHeading: 'Certificates:',
   qrInfoValidDateLabel: 'Valid until', qrInfoMoreLabel: 'Full profile', qrInfoNoCerts: 'No certificates recorded.',
   qrInfoUpdatedLabel: 'Record updated', profileUpdatedLabel: 'Record updated',
   filterSegmentAll: 'All production stages', filterAllShort: 'All',
-  publicInfoBanner: 'CSWIND Vietnam public welder lookup — anyone with the link can view it, no account needed. Staff with an account sign in on the Admin tab to add/edit data, view the expiring report and print QR codes.',
+  publicInfoBanner: label=>`${label} public welder lookup — anyone with the link can view it, no account needed. Staff with an account sign in on the Admin tab to add/edit data, view the expiring report and print QR codes.`,
   accountsTitle: 'Manage admin accounts', accountsSuperOnlyNote: 'Super admins see and manage every account',
   accountsGrantTitle: 'Grant a new admin account', accountsDisplayName: 'Username', accountsTempPin: 'Temporary password',
   accountsRole: 'Permission level', accountsRoleEditorHint: 'add/edit data', accountsCreateBtn: 'Create account', accountsResetPin: 'Reset password',
@@ -475,13 +475,25 @@ function setLang(lang){
   renderStaticText();
   renderAll();
 }
+// Staff-only hint on the Lookup tab: hidden for guests (QR-scanning customers) and "View only"
+// accounts; names the entity currently selected instead of always "CSWIND Việt Nam".
+function renderPublicInfoBanner(){
+  const el = $('#public-info-banner');
+  if(!el) return;
+  const show = !!session && ['superadmin','entityadmin','editor'].includes(session.role);
+  el.style.display = show ? '' : 'none';
+  el.textContent = show ? L.publicInfoBanner(entityLabel(activeEntity)) : '';
+}
+function defaultCompanyFor(code){
+  return code==='CSW-VN' ? 'CSWIND Việt Nam' : entityLabel(code);
+}
 function renderStaticText(){
   $('#app-title').textContent = L.appTitle;
   $('#tabbtn-lookup').textContent = L.tabLookup;
   $('#tabbtn-admin').textContent = L.tabAdmin;
   $('#search-box').placeholder = L.searchPlaceholder;
   $('#readonly-banner').textContent = L.readOnlyBanner;
-  $('#public-info-banner').textContent = L.publicInfoBanner;
+  renderPublicInfoBanner();
   $('.theme-btn[data-theme-choice="light"]').textContent = L.themeLight;
   $('.theme-btn[data-theme-choice="dark"]').textContent = L.themeDark;
   $('.theme-btn[data-theme-choice="system"]').textContent = L.themeSystem;
@@ -1610,7 +1622,7 @@ function openWelderForm(idWelder){
     <div class="field"><label>${L.fieldCode}</label><input type="text" id="wf-code" value="${esc(w?w.idWelder:'')}" ${w?'disabled':''} placeholder="CS4000"></div>
     <div class="field"><label>${L.fieldName}</label><input type="text" id="wf-name" value="${esc(w?w.name:'')}"></div>
     <div class="field"><label>${L.fieldEmployeeId}</label><input type="text" id="wf-empid" value="${esc(w?w.idEmployee||'':'')}"></div>
-    <div class="field"><label>${L.fieldCompany}</label><input type="text" id="wf-company" value="${esc(w?w.company||'CSWIND Việt Nam':'CSWIND Việt Nam')}"></div>
+    <div class="field"><label>${L.fieldCompany}</label><input type="text" id="wf-company" value="${esc(w ? (w.company||defaultCompanyFor(w.entity)) : defaultCompanyFor(activeEntity))}"></div>
     <div class="field"><label>${L.fieldEntity}</label>
       <select id="wf-entity">${ENTITIES.filter(e=>canWriteEntity(e.code)).map(e=>`<option value="${esc(e.code)}" ${(w?w.entity:activeEntity)===e.code?'selected':''}>${esc(e.label)}</option>`).join('')}</select>
     </div>
@@ -1854,7 +1866,7 @@ async function runImport(){
         idWelder,
         name: (row[colIdx.name]||'').toString().trim(),
         idEmployee: colIdx.idEmployee!=null && row[colIdx.idEmployee]!=null ? String(row[colIdx.idEmployee]).trim() : '',
-        company: 'CSWIND Việt Nam',
+        company: defaultCompanyFor(activeEntity),
         certificates: [],
       };
     }
@@ -1999,6 +2011,7 @@ function activateTab(tab){
   $('#tab-admin').style.display = tab==='admin' ? 'block' : 'none';
 }
 function renderAll(){
+  renderPublicInfoBanner();
   wireEntityBar('entity-bar-lookup');
   renderStats();
   renderLookupFilterBar();

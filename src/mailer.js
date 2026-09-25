@@ -95,7 +95,7 @@ const TXT = {
   listHeading: 'Danh sách / List:',
   closing: 'Đề nghị gia hạn hoặc tái đánh giá tay nghề trước ngày hết hạn. / Please renew or re-qualify before the expiry date.',
   signOff: 'Trân trọng / Regards,',
-  signName: 'CSWIND — QR-ID Thợ hàn (email tự động thứ 2 & thứ 6 / automated Monday & Friday reminder)',
+  signName: 'CS Wind Welder Certification Control (email tự động thứ 2 & thứ 6 / automated Monday & Friday reminder)',
   none: '(Không có chứng chỉ nào sắp/đã hết hạn. / None currently expiring or expired.)',
 };
 

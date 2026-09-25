@@ -28,7 +28,7 @@ var CAU_HINH = {
   APP_URL: 'https://cswind-weldercontrol.onrender.com', // địa chỉ app, không có dấu / ở cuối
   GIO_GUI: 8,                        // giờ gửi (0–23), theo giờ Việt Nam
   MUI_GIO: 'Asia/Ho_Chi_Minh',
-  TEN_NGUOI_GUI: 'CSWIND QR-ID Thợ hàn', // tên hiển thị ở ô "Người gửi"
+  TEN_NGUOI_GUI: 'CS Wind Welder Certification Control', // tên hiển thị ở ô "Người gửi"
   GUI_TONG_HOP: true,                // true = sau mỗi lần chạy gửi 1 email tổng hợp về Gmail này
   SO_LAN_THU: 3,                     // app trên Render gói Free có thể đang "ngủ" — thử lại vài lần
   CHO_GIUA_CAC_LAN_THU_GIAY: 20,

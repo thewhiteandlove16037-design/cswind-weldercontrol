@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<title>CSWIND · QR-ID Thợ hàn</title>
+<title>CS Wind Welder Certification Control</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -42,8 +42,8 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 header.top{background:var(--brand);color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-header.top .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px}
-header.top .brand .logo{width:30px;height:30px;border-radius:7px;background:#fff;color:var(--brand);display:flex;align-items:center;justify-content:center;font-weight:800}
+header.top .brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:24px;line-height:1.2;letter-spacing:.01em}
+header.top .brand .logo{width:40px;height:40px;flex:none;border-radius:9px;background:#fff;color:var(--brand);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px}
 header.top .clock{font-size:13px;opacity:.92;font-variant-numeric:tabular-nums}
 .session-badge{font-size:12px;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.16);border-radius:99px;padding:4px 10px 4px 4px;white-space:nowrap}
 .session-badge .role-pill{padding:1px 8px;border-radius:99px;font-weight:800;font-size:10.5px;text-transform:uppercase;letter-spacing:.02em}
@@ -176,13 +176,13 @@ input[type=file]{font-size:13px}
   background:var(--brand);color:#fff;border:none;font-size:20px;font-weight:800;cursor:pointer;
   box-shadow:var(--shadow);z-index:60;display:flex;align-items:center;justify-content:center}
 #back-to-top:hover{background:var(--brand2)}
-@media (max-width:600px){ main{padding:10px} .stat{gap:8px} .cert-edit-grid{grid-template-columns:1fr} .session-badge{display:none} #back-to-top{right:12px;bottom:70px;width:42px;height:42px} }
+@media (max-width:600px){ header.top .brand{font-size:19px;gap:10px} header.top .brand .logo{width:34px;height:34px;font-size:15px} main{padding:10px} .stat{gap:8px} .cert-edit-grid{grid-template-columns:1fr} .session-badge{display:none} #back-to-top{right:12px;bottom:70px;width:42px;height:42px} }
 </style>
 </head>
 <body>
 
 <header class="top">
-  <div class="brand"><span class="logo">CS</span> <span id="app-title">CSWIND QR-ID Thợ hàn</span></div>
+  <div class="brand"><span class="logo">CS</span> <span id="app-title">CS Wind Welder Certification Control</span></div>
   <div class="row" style="gap:14px">
     <div class="session-badge" id="session-badge" style="display:none"></div>
     <div class="clock" id="live-clock">--:--:--</div>
