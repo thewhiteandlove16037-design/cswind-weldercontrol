@@ -231,8 +231,11 @@ const L_VI = {
   reminderComposeBtn: 'Soạn email nhắc nhở', reminderSentToast: 'Đã mở email nhắc nhở — kiểm tra ứng dụng email của bạn.',
   reminderSendNowBtn: 'Gửi thử ngay (email thật)',
   reminderSentNowToast: n=>`Đã gửi email nhắc nhở thật (${n} chứng chỉ sắp/đã hết hạn).`,
-  reminderAutoConfigured: '✓ Đã cấu hình gửi tự động hàng tuần (thứ 2).',
-  reminderAutoNotConfigured: 'Chưa cấu hình gửi email tự động — cần thêm biến môi trường SMTP trên Render (xem DEPLOY.md).',
+  reminderAutoConfigured: '✓ App tự gửi email nhắc nhở qua SMTP — thứ 2 & thứ 6, 8:00.',
+  reminderAutoGmail: '✓ Gửi tự động qua Gmail (Google Apps Script) — thứ 2 & thứ 6, khoảng 8:00. Người nhận lấy từ mục Cài đặt ở trên.',
+  reminderAutoNotConfigured: 'Chưa bật gửi email tự động — làm theo mục "Gửi email nhắc nhở tự động qua Gmail" trong DEPLOY.md.',
+  reminderLastSent: (when,n,to)=>`Lần gửi gần nhất: ${when} — ${n} chứng chỉ${to ? ' → '+to : ''}.`,
+  reminderLastNone: 'Chưa ghi nhận lần gửi nào.',
   reminderSubjectLabel: 'Tiêu đề', reminderBodyLabel: 'Nội dung',
   reminderNoEmailsToast: 'Chưa có email người nhận — thêm trong Cài đặt.',
   masterListTitle: n=>`Danh sách tổng (${n} thợ hàn)`,
@@ -339,8 +342,11 @@ const L_EN = {
   reminderComposeBtn: 'Compose reminder email', reminderSentToast: 'Reminder email opened — check your email app.',
   reminderSendNowBtn: 'Send test now (real email)',
   reminderSentNowToast: n=>`Real reminder email sent (${n} expiring/expired certificate(s)).`,
-  reminderAutoConfigured: '✓ Automatic weekly (Monday) sending is configured.',
-  reminderAutoNotConfigured: 'Automatic email sending isn\'t configured yet — add SMTP environment variables on Render (see DEPLOY.md).',
+  reminderAutoConfigured: '✓ The app sends reminder emails via SMTP — Monday & Friday, 08:00.',
+  reminderAutoGmail: '✓ Automatic sending via Gmail (Google Apps Script) — Monday & Friday, around 08:00. Recipients come from Settings above.',
+  reminderAutoNotConfigured: 'Automatic email sending isn\'t enabled yet — follow "Automatic reminder emails via Gmail" in DEPLOY.md.',
+  reminderLastSent: (when,n,to)=>`Last sent: ${when} — ${n} certificate(s)${to ? ' → '+to : ''}.`,
+  reminderLastNone: 'No send recorded yet.',
   reminderSubjectLabel: 'Subject', reminderBodyLabel: 'Body',
   reminderNoEmailsToast: 'No recipient email — add one in Settings.',
   masterListTitle: n=>`Master list (${n} welders)`,
@@ -681,15 +687,20 @@ async function refreshSession(){
   try{ session = await apiFetch('GET', '/api/auth/me'); }
   catch(e){ session = null; }
 }
-function enterAdmin(acc){
+async function enterAdmin(acc){
   session = acc;
   readOnlyMode = false;
+  // Settings were first loaded anonymously (recipient emails are staff-only and come back
+  // empty) -- reload now that we're signed in, otherwise the Settings form shows an empty
+  // email box and a "Save settings" click would wipe the real recipient list.
+  try{ await loadSettings(); }catch(e){ /* keep what we have */ }
   renderAll();
 }
 async function logoutAdmin(){
   try{ await apiFetch('POST', '/api/auth/logout'); }catch(e){ /* cookie may already be gone */ }
   session = null;
   ACCOUNTS = [];
+  try{ await loadSettings(); }catch(e){ /* keep what we have */ }
   renderAll();
 }
 
@@ -911,7 +922,7 @@ function renderAdmin(){
       btn.textContent = L.loginChecking;
       try{
         const acc = await tryLogin(u, p);
-        enterAdmin(acc);
+        await enterAdmin(acc);
       }catch(e){
         $('#login-err').textContent = L.loginError;
       }finally{
@@ -1197,7 +1208,7 @@ async function deleteAccount(id, name){
 
 /* ================= REMINDER EMAIL / EXPIRING REPORT ================= */
 function renderReminderPanel(){
-  const emails = (SETTINGS.emails||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const emails = (SETTINGS.emails||'').split(/[,;]/).map(s=>s.trim()).filter(Boolean);
   $('#reminder-recipients-line').innerHTML = emails.length
     ? L.reminderWillSendTo + ' ' + emails.map(e=>`<span class="chip">${esc(e)}</span>`).join('')
     : L.reminderNoEmails;
@@ -1255,7 +1266,7 @@ function openMailto(mailtoHref){
   document.body.removeChild(a);
 }
 function composeReminderEmail(){
-  const emails = (SETTINGS.emails||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const emails = (SETTINGS.emails||'').split(/[,;]/).map(s=>s.trim()).filter(Boolean);
   if(!emails.length){ toast(L.reminderNoEmailsToast); return; }
   const fullList = expiringList(); // already sorted soonest-expiry first
   const subject = `[CSWIND] Danh sách thợ hàn cần gia hạn / tái đánh giá — ${fmtDate(todayISO())}`;
@@ -1296,7 +1307,19 @@ async function refreshReminderAutoStatus(){
   if(!el) return;
   try{
     const s = await apiFetch('GET', '/api/reminders/status');
-    el.textContent = s.configured ? L.reminderAutoConfigured : L.reminderAutoNotConfigured;
+    // "Send test now" goes through the server's own SMTP -- only meaningful when that is
+    // configured (paid Render plan). In Gmail/Apps Script mode, testing is done from the
+    // script's "Run" button instead, so hide the button rather than let it error.
+    const btn = $('#btn-send-reminder-now');
+    if(btn) btn.style.display = s.configured ? '' : 'none';
+    const head = s.configured ? L.reminderAutoConfigured : s.gmailReady ? L.reminderAutoGmail : L.reminderAutoNotConfigured;
+    let lastLine = '';
+    if(s.last && s.last.at){
+      lastLine = L.reminderLastSent(fmtDateTime(new Date(s.last.at)), s.last.count==null ? '?' : s.last.count, s.last.to || '');
+    }else if(s.configured || s.gmailReady){
+      lastLine = L.reminderLastNone;
+    }
+    el.innerHTML = esc(head) + (lastLine ? '<br>' + esc(lastLine) : '');
   }catch(e){ el.textContent = ''; }
 }
 async function sendReminderNow(){

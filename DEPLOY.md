@@ -117,62 +117,104 @@ mở app trực tiếp ở URL Render (không qua SharePoint) để làm việc,
 cấu hình mặc định hiện tại (`SameSite=Lax`), đánh đổi lấy khả năng hoạt động tốt hơn trong
 iframe.
 
-## Bước 7 — Gửi email nhắc nhở tự động mỗi thứ 2 hàng tuần
+## Bước 7 — Gửi email nhắc nhở tự động qua Gmail (thứ 2 & thứ 6, 8:00)
 
-Ứng dụng có thể tự gửi email (danh sách thợ hàn sắp/đã hết hạn chứng chỉ) tới các địa chỉ
-trong Cài đặt (Settings > emails) — thật sự gửi qua máy chủ, không cần mở trình duyệt.
+Mỗi thứ 2 và thứ 6, khoảng 8:00 sáng (giờ Việt Nam), một email liệt kê các chứng chỉ **sắp /
+đã hết hạn** sẽ được gửi **từ Gmail cá nhân của bạn** tới các địa chỉ trong mục Cài đặt của app
+(tab Quản trị > Cài đặt > "Danh sách email nhận nhắc nhở").
 
-### 7a — Lấy App Password cho hộp thư Outlook/Office 365
+**Vì sao không gửi thẳng từ app?** Từ 26/09/2025, Render gói Free **chặn mọi kết nối gửi mail
+(SMTP, cổng 25/465/587)**. Vì vậy việc gửi được giao cho **Google Apps Script** — một đoạn
+script nhỏ chạy miễn phí ngay trong tài khoản Gmail của bạn. Script tự hỏi app danh sách, rồi
+tự gửi mail bằng Gmail. Không cần App Password, không cần cron-job.org, không cần nâng gói.
 
-1. Chọn một hộp thư sẽ dùng để gửi (ví dụ `noreply@cswind.com.vn` hoặc hộp thư của bạn).
-2. Đăng nhập https://account.microsoft.com/security → tìm mục **App passwords / Mật khẩu
-   ứng dụng** (nếu hộp thư có bật xác thực 2 lớp — thường là bắt buộc ở công ty).
-3. Tạo một App Password mới, đặt tên gợi nhớ (ví dụ "CSWIND Welder App"), copy lại chuỗi
-   mật khẩu hiện ra (chỉ hiện một lần).
+> Nếu trước đây bạn đã tạo cron-job.org theo hướng dẫn cũ, hãy **xoá (Delete) job đó** —
+> không còn cần nữa. Và **không** thêm các biến `SMTP_USER` / `SMTP_PASS` trên Render (nếu đã
+> có thì xoá đi), tránh việc sau này mail bị gửi 2 lần.
 
-**Nếu không thấy mục "App passwords"**: có thể do bộ phận IT của CSWIND đã tắt tính năng
-xác thực SMTP cơ bản (Microsoft đang dần tắt tính năng này cho toàn bộ khách hàng doanh
-nghiệp) — trường hợp này cần nhờ IT cấp quyền qua Azure AD App Registration (phức tạp hơn,
-báo lại nếu gặp trường hợp này để tôi hướng dẫn tiếp theo hướng khác).
+### 7a — Đặt mã bí mật trên Render (1 lần)
 
-### 7b — Thêm biến môi trường trên Render
+Mã bí mật giúp chỉ script của bạn mới lấy được danh sách từ app.
 
-Vào Web Service `cswind-weldercontrol` → **Environment**, thêm:
+1. Tự nghĩ một chuỗi dài, khó đoán, **chỉ gồm chữ không dấu và số**, ít nhất 24 ký tự
+   (ví dụ kiểu `Cswind7Kq2mZx9RtPw4vLb8nYh3`). Ghi tạm ra chỗ an toàn — lát nữa cần dán ở 7c.
+2. Vào Render → Web Service `cswind-weldercontrol` → **Environment** → **Add Environment Variable**:
+   - Key: `REMINDER_SECRET`
+   - Value: chuỗi vừa nghĩ ở trên (nếu đã có biến này từ trước thì giữ nguyên giá trị cũ cũng được)
+3. Bấm **Save, rebuild, and deploy**, chờ deploy xong (trạng thái **Live**).
 
-- `SMTP_USER` → hộp thư gửi, ví dụ `noreply@cswind.com.vn`
-- `SMTP_PASS` → App Password vừa tạo ở Bước 7a (không phải mật khẩu đăng nhập thường)
-- `MAIL_FROM` → (tuỳ chọn) địa chỉ hiển thị ở "Từ" — để trống thì dùng luôn `SMTP_USER`
-- `REMINDER_SECRET` → một chuỗi bí mật tự đặt (dùng cho Bước 7c) — ví dụ `cswind-remind-2026-xyz`
+### 7b — Tạo script trong Gmail của bạn
 
-Bấm **Save, rebuild, and deploy**.
+1. Mở trình duyệt, **đăng nhập đúng Gmail cá nhân** sẽ dùng để gửi mail.
+2. Vào **https://script.google.com** → bấm **New project** (Dự án mới).
+3. Bấm vào chữ **Untitled project** ở góc trên bên trái, đổi tên thành `CSWIND - Gui mail nhac nho`.
+4. Trong khung soạn code, **xoá hết** nội dung có sẵn (`function myFunction() {...}`).
+5. Mở file `google-apps-script/GuiMailNhacNho.gs` (có trong gói code này, hoặc file Claude gửi
+   kèm), copy **toàn bộ** nội dung, dán vào khung soạn code.
+6. Bấm biểu tượng **💾 Save** (Lưu) hoặc Ctrl + S.
 
-Sau khi deploy xong, đăng nhập app bằng tài khoản superadmin, vào tab Quản trị, tìm nút
-**"Gửi thử ngay (email thật)"** trong mục nhắc nhở — bấm thử để xác nhận email gửi thành
-công tới các địa chỉ trong Cài đặt.
+### 7c — Dán mã bí mật vào script
 
-### 7c — Hẹn giờ tự động mỗi thứ 2 (dùng dịch vụ miễn phí bên ngoài)
+1. Ở thanh bên trái, bấm biểu tượng **⚙ Project Settings** (Cài đặt dự án).
+2. Kéo xuống cuối, mục **Script properties** (Thuộc tính tập lệnh) → bấm **Add script property**:
+   - Property: `REMINDER_SECRET`
+   - Value: **đúng y chuỗi** đã đặt trên Render ở 7a (không thừa dấu cách)
+3. Bấm **Save script properties**.
 
-Vì gói Render miễn phí tự "ngủ", cần một dịch vụ bên ngoài "đánh thức" app đúng giờ hẹn:
+### 7d — Kiểm tra kết nối & cấp quyền (lần đầu)
 
-1. Vào https://cron-job.org, tạo tài khoản miễn phí (email + mật khẩu).
-2. Sau khi đăng nhập, bấm **Create cronjob**.
-3. Điền:
-   - **Title**: `CSWIND weekly reminder`
-   - **URL**: `https://cswind-weldercontrol.onrender.com/api/reminders/send`
-   - **Request method**: `POST`
-   - Kéo xuống mục **Advanced** (hoặc **Headers**) → thêm một header:
-     - Tên (Name): `X-Reminder-Secret`
-     - Giá trị (Value): đúng chuỗi bạn đặt ở `REMINDER_SECRET` Bước 7b
-   - **Schedule**: chọn chạy vào **Thứ 2 (Monday)**, giờ Việt Nam khoảng 8:00 sáng (cron-job.org
-     dùng UTC — 8:00 giờ VN = 01:00 UTC, tương ứng biểu thức `0 1 * * 1`)
-4. Bấm **Create** / **Save**.
+1. Bấm biểu tượng **< > Editor** ở thanh bên trái để quay lại màn hình code.
+2. Trên thanh công cụ, ô chọn hàm (cạnh nút **▷ Run**) → chọn **`kiemTraKetNoi`** → bấm **▷ Run**.
+3. Lần đầu Google sẽ hỏi quyền — đây là bạn cấp quyền cho **chính script của bạn**:
+   - Bấm **Review permissions** → chọn tài khoản Gmail của bạn.
+   - Nếu hiện "**Google hasn't verified this app**" (Google chưa xác minh ứng dụng này): bấm
+     **Advanced** (Nâng cao) → **Go to CSWIND - Gui mail nhac nho (unsafe)**. Cảnh báo này luôn
+     hiện với script tự viết, không phải lỗi.
+   - Bấm **Allow** (Cho phép). Script xin 3 quyền: kết nối tới dịch vụ bên ngoài (để gọi app),
+     gửi email thay bạn, và chạy theo lịch.
+4. Xem khung **Execution log** bên dưới. Thành công sẽ thấy:
+   `✓ Kết nối app thành công.` + danh sách người nhận + số chứng chỉ sắp/đã hết hạn.
+   - Nếu báo **"Người nhận: (chưa có…)"**: vào app → tab Quản trị → Cài đặt → điền email người
+     nhận (nhiều email cách nhau bằng dấu phẩy) → **Lưu cài đặt**, rồi chạy lại.
+   - Nếu báo **401 / từ chối mã bí mật**: mã ở 7c không khớp với Render ở 7a — sửa cho giống hệt.
+   - Nếu báo **404**: app chưa chạy bản `update7` — upload lại code và chờ Render deploy xong.
+   - Nếu báo **"Lần thử 1 chưa được…"** rồi sau đó thành công: bình thường — app trên gói Free
+     đang "ngủ", mất khoảng 1 phút để thức dậy.
 
-Từ đó, mỗi thứ 2 lúc 8h sáng, cron-job.org sẽ gọi vào app và app tự gửi email nhắc nhở —
-không cần mở trình duyệt, không cần Claude.
+### 7e — Gửi thử 1 email thật
 
-**Muốn app luôn thức, hẹn giờ chạy chính xác hơn**: nâng cấp Web Service lên gói trả phí
-(~$7/tháng, xem "Ghi chú về gói Render" cuối tài liệu) — khi đó app tự hẹn giờ chính xác bên
-trong, bước 7c ở trên trở thành dự phòng chứ không bắt buộc.
+Chọn hàm **`guiMailNhacNho`** → **▷ Run**. Kiểm tra hộp thư của người nhận (và thư mục **Spam**
+lần đầu — nếu mail nằm trong Spam, bấm "Không phải thư rác"). Mở lại tab Quản trị của app:
+dòng trạng thái cuối mục nhắc nhở sẽ hiện **"Lần gửi gần nhất: …"**.
+
+### 7f — Bật lịch tự động thứ 2 & thứ 6 (chỉ làm 1 lần)
+
+Chọn hàm **`caiDatLichGui`** → **▷ Run**. Execution log hiện
+`✓ Đã bật lịch gửi: thứ 2 và thứ 6, khoảng 8:00 …` là xong. Có thể kiểm tra bằng cách bấm biểu
+tượng **⏰ Triggers** ở thanh bên trái — sẽ thấy 2 dòng `guiMailNhacNho` (Weekly, Monday /
+Friday, 8am to 9am hoặc tương tự).
+
+Từ giờ, mỗi thứ 2 và thứ 6, Google tự chạy script — **không cần mở máy, không cần mở trình
+duyệt**. Google chạy lịch trong khoảng ±15 phút quanh 8:00, nên mail có thể đến trong khoảng
+7:45–8:15 (thêm tối đa ~1 phút nếu app đang "ngủ").
+
+### Ghi chú
+
+- **Đổi người nhận**: chỉ cần sửa trong app (Quản trị > Cài đặt), không cần đụng vào script.
+- **Đổi giờ gửi**: sửa số `GIO_GUI: 8` ở đầu script → Save → chạy lại `caiDatLichGui`.
+- **Tắt tạm thời**: chạy hàm `huyLichGui`. Bật lại: chạy `caiDatLichGui`.
+- **Nếu gửi lỗi** (app không phản hồi, sai mã bí mật…), script tự gửi 1 email cảnh báo
+  "⚠ Chưa gửi được email nhắc nhở" về chính Gmail của bạn. Muốn gửi bù thì mở script, chạy
+  `guiMailNhacNho`.
+- **Giới hạn của Gmail cá nhân**: tối đa khoảng 100 người nhận/ngày qua script — dư sức cho
+  danh sách nhắc nhở nội bộ.
+- Nút **"Gửi thử ngay (email thật)"** trong app chỉ dùng khi app gửi trực tiếp bằng SMTP (gói
+  Render trả phí). Với cách gửi qua Gmail/Apps Script, nút này được ẩn đi — gửi thử bằng cách
+  chạy `guiMailNhacNho` trong script như ở 7e.
+- **(Chỉ khi nâng Render lên gói trả phí)** có thể cho app tự gửi thẳng qua Gmail: bật xác minh
+  2 bước cho Gmail → tạo App Password tại https://myaccount.google.com/apppasswords → thêm trên
+  Render `SMTP_USER` = địa chỉ Gmail, `SMTP_PASS` = App Password (16 ký tự). App tự gửi thứ 2 &
+  thứ 6 lúc 8:00. Khi đó **phải tắt lịch Apps Script** (`huyLichGui`) để không gửi trùng.
 
 ## Bước 8 — Nhiều entity (CSW-VN, CSW-HQ, CSW-TR...)
 
@@ -211,8 +253,8 @@ Cách dùng:
   hai entity khác nhau không thể có cùng một mã thợ hàn (vd `CS006` chỉ tồn tại ở một entity).
 - **QR code / link riêng của từng thợ hàn không đổi** — vẫn theo mã thợ hàn
   (`.../<mã thợ hàn>`), không phân biệt entity trong đường link.
-- **Lưu ý về email nhắc nhở tự động (Bước 7)**: email nhắc nhở hàng tuần hiện vẫn gửi chung
-  cho *tất cả* các entity trong một email duy nhất, chưa tách riêng theo từng entity. Nếu cần
+- **Lưu ý về email nhắc nhở tự động (Bước 7)**: email nhắc nhở hiện vẫn gửi chung cho *tất
+  cả* các entity trong một email duy nhất (mỗi dòng có ghi rõ entity), chưa tách riêng theo từng entity. Nếu cần
   tách email riêng theo entity (vd CSW-HQ tự nhận email riêng), báo lại Claude để bổ sung.
 
 ## Việc cần làm sau khi deploy xong
@@ -226,19 +268,23 @@ Cách dùng:
       nhận thay đổi lưu lại thật (tải lại trang để chắc chắn)
 - [ ] Test thử luồng khách hàng: quét mã QR (hoặc mở link tra cứu) mà không đăng nhập, xác
       nhận xem được thông tin chứng chỉ — quét QR giờ sẽ mở thẳng trang riêng của thợ hàn đó
-- [ ] Cấu hình email nhắc nhở tự động (Bước 7), bấm "Gửi thử ngay" để xác nhận hoạt động
+- [ ] Cấu hình email nhắc nhở tự động qua Gmail (Bước 7), chạy `guiMailNhacNho` để gửi thử
 - [ ] Nếu công ty có nhiều chi nhánh (CSW-HQ, CSW-TR...), thử bấm qua lại các nút entity ở tab
       Tra cứu/Quản trị (Bước 8) để quen với cách chuyển đổi
 
 ## Ghi chú về gói Render (Free vs trả phí)
 
 Gói **Free** của Render sẽ tự "ngủ" (sleep) sau ~15 phút không có ai truy cập, và mất khoảng
-30-50 giây để "thức dậy" ở lượt truy cập tiếp theo — nếu nhân viên quét mã QR và phải chờ, đây
-là nguyên nhân. Database Free của Render cũng có giới hạn thời gian lưu trữ (thường bị xoá sau
-90 ngày nếu không nâng cấp). Nếu app này sẽ được dùng thường xuyên trong công việc thực tế của
-CSWIND (không chỉ để thử nghiệm), nên nâng cấp Web Service và Database lên gói trả phí thấp
-nhất (Starter, khoảng $7/tháng mỗi loại tại thời điểm viết tài liệu này — kiểm tra giá hiện tại
-trên render.com/pricing vì giá có thể thay đổi) để tránh tình trạng "ngủ" và mất dữ liệu.
+30-60 giây để "thức dậy" ở lượt truy cập tiếp theo — nếu nhân viên quét mã QR và phải chờ, đây
+là nguyên nhân.
+
+**⚠ Quan trọng — Database gói Free chỉ sống 30 ngày**: theo tài liệu của Render
+(https://render.com/docs/free), database PostgreSQL gói Free **hết hạn 30 ngày sau khi tạo**;
+sau đó có 14 ngày để nâng cấp, quá hạn Render **xoá hẳn database cùng toàn bộ dữ liệu**. Vào
+Render Dashboard → database của app để xem ngày tạo / cảnh báo hết hạn. Vì app đang chứa dữ liệu
+thật, nên nâng **Database** lên gói trả phí thấp nhất trước hạn (kiểm tra giá trên
+render.com/pricing). Web Service có thể giữ gói Free — email nhắc nhở qua Gmail (Bước 7) vẫn
+chạy bình thường trên gói Free.
 
 ## Nếu gặp lỗi khi deploy
 

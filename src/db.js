@@ -110,6 +110,12 @@ async function initSchema() {
   // NOT EXISTS above only affects brand-new tables) -- idempotent, safe to run every boot.
   await pool.query(`ALTER TABLE welders ADD COLUMN IF NOT EXISTS entity TEXT NOT NULL DEFAULT 'CSW-VN'`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_welders_entity ON welders(entity)`);
+  // "Last reminder sent" bookkeeping (update7) -- written by the Gmail/Apps Script ack call
+  // or by a direct SMTP send, shown in the admin UI. Idempotent, safe on the live database.
+  await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS last_reminder_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS last_reminder_count INTEGER`);
+  await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS last_reminder_to TEXT`);
+  await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS last_reminder_via TEXT`);
   // Seed a single settings row if none exists yet.
   await pool.query(
     `INSERT INTO settings (id, base_url, warn_days, emails)
